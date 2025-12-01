@@ -58,6 +58,15 @@ export default {
         ink: "hsl(var(--ink))",
         stamp: "hsl(var(--stamp))",
         gold: "hsl(var(--gold))",
+        // Eranove Academy specific colors
+        eranove: {
+          navy: "hsl(var(--eranove-navy))",
+          blue: "hsl(var(--eranove-blue))",
+          teal: "hsl(var(--eranove-teal))",
+          green: "hsl(var(--eranove-green))",
+          lime: "hsl(var(--eranove-lime))",
+          yellow: "hsl(var(--eranove-yellow))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -95,7 +104,7 @@ export default {
       },
       boxShadow: {
         paper: "0 4px 20px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3)",
-        glow: "0 0 30px rgba(180, 60, 60, 0.3)",
+        glow: "0 0 30px rgba(85, 169, 61, 0.3)",
       },
     },
   },

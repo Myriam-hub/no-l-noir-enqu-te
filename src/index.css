@@ -6,57 +6,66 @@
 
 @layer base {
   :root {
-    --background: 20 15% 8%;
-    --foreground: 35 30% 85%;
+    /* Eranove Academy Color Palette */
+    --background: 215 50% 12%;
+    --foreground: 180 20% 90%;
 
-    --card: 25 20% 12%;
-    --card-foreground: 35 30% 85%;
+    --card: 215 45% 16%;
+    --card-foreground: 180 20% 90%;
 
-    --popover: 25 20% 12%;
-    --popover-foreground: 35 30% 85%;
+    --popover: 215 45% 16%;
+    --popover-foreground: 180 20% 90%;
 
-    --primary: 0 65% 45%;
-    --primary-foreground: 35 30% 95%;
+    --primary: 104 48% 45%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 30 25% 18%;
-    --secondary-foreground: 35 30% 85%;
+    --secondary: 215 40% 22%;
+    --secondary-foreground: 180 20% 90%;
 
-    --muted: 25 15% 20%;
-    --muted-foreground: 35 20% 55%;
+    --muted: 215 30% 25%;
+    --muted-foreground: 180 15% 55%;
 
-    --accent: 35 45% 75%;
-    --accent-foreground: 20 15% 10%;
+    --accent: 52 95% 55%;
+    --accent-foreground: 215 50% 15%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 30 20% 25%;
-    --input: 30 20% 20%;
-    --ring: 0 65% 45%;
+    --border: 203 40% 30%;
+    --input: 215 40% 20%;
+    --ring: 104 48% 45%;
 
     --radius: 0.25rem;
 
-    /* Custom tokens */
-    --paper: 38 35% 82%;
-    --paper-foreground: 25 40% 15%;
-    --ink: 25 40% 15%;
-    --stamp: 0 65% 40%;
-    --gold: 45 80% 50%;
+    /* Custom Eranove tokens */
+    --eranove-navy: 215 50% 30%;
+    --eranove-blue: 203 64% 40%;
+    --eranove-teal: 183 47% 48%;
+    --eranove-green: 104 48% 45%;
+    --eranove-lime: 65 70% 44%;
+    --eranove-yellow: 52 95% 55%;
+    
+    --paper: 180 15% 88%;
+    --paper-foreground: 215 50% 15%;
+    --ink: 215 50% 15%;
+    --stamp: 104 48% 40%;
+    --gold: 52 95% 55%;
     
     /* Gradients */
-    --gradient-paper: linear-gradient(145deg, hsl(38 35% 85%), hsl(35 30% 75%));
-    --gradient-dark: linear-gradient(180deg, hsl(20 15% 10%), hsl(20 15% 5%));
-    --gradient-vignette: radial-gradient(ellipse at center, transparent 0%, hsl(20 15% 5% / 0.8) 100%);
+    --gradient-paper: linear-gradient(145deg, hsl(180 15% 90%), hsl(180 12% 82%));
+    --gradient-dark: linear-gradient(180deg, hsl(215 50% 14%), hsl(215 50% 8%));
+    --gradient-vignette: radial-gradient(ellipse at center, transparent 0%, hsl(215 50% 8% / 0.8) 100%);
+    --gradient-eranove: linear-gradient(135deg, hsl(var(--eranove-navy)), hsl(var(--eranove-blue)));
     
     /* Shadows */
     --shadow-paper: 0 4px 20px hsl(0 0% 0% / 0.4), 0 2px 8px hsl(0 0% 0% / 0.3);
-    --shadow-glow: 0 0 30px hsl(0 65% 45% / 0.3);
-    --shadow-stamp: 2px 2px 0px hsl(0 65% 30% / 0.5);
+    --shadow-glow: 0 0 30px hsl(104 48% 45% / 0.3);
+    --shadow-stamp: 2px 2px 0px hsl(104 48% 30% / 0.5);
   }
 
   .dark {
-    --background: 20 15% 8%;
-    --foreground: 35 30% 85%;
+    --background: 215 50% 12%;
+    --foreground: 180 20% 90%;
   }
 }
 
@@ -126,12 +135,16 @@
     color: hsl(var(--ink));
   }
 
-  .blood-accent {
-    color: hsl(var(--primary));
+  .eranove-accent {
+    color: hsl(var(--eranove-green));
   }
 
   .gold-accent {
     color: hsl(var(--gold));
+  }
+
+  .eranove-gradient {
+    background: var(--gradient-eranove);
   }
 }
 
