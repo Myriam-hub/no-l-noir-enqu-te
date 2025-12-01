@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Special+Elite&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Crimson+Text&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -20,7 +21,7 @@
     --primary-foreground: 0 0% 100%;
 
     --secondary: 215 40% 22%;
-    --secondary-foreground: 180 20% 90%;
+    --secondary-foreground: 0 0% 100%;
 
     --muted: 215 30% 25%;
     --muted-foreground: 180 15% 55%;
@@ -44,19 +45,19 @@
     --eranove-green: 104 48% 45%;
     --eranove-lime: 65 70% 44%;
     --eranove-yellow: 52 95% 55%;
-    
+
     --paper: 180 15% 88%;
     --paper-foreground: 215 50% 15%;
     --ink: 215 50% 15%;
     --stamp: 104 48% 40%;
     --gold: 52 95% 55%;
-    
+
     /* Gradients */
     --gradient-paper: linear-gradient(145deg, hsl(180 15% 90%), hsl(180 12% 82%));
     --gradient-dark: linear-gradient(180deg, hsl(215 50% 14%), hsl(215 50% 8%));
     --gradient-vignette: radial-gradient(ellipse at center, transparent 0%, hsl(215 50% 8% / 0.8) 100%);
     --gradient-eranove: linear-gradient(135deg, hsl(var(--eranove-navy)), hsl(var(--eranove-blue)));
-    
+
     /* Shadows */
     --shadow-paper: 0 4px 20px hsl(0 0% 0% / 0.4), 0 2px 8px hsl(0 0% 0% / 0.3);
     --shadow-glow: 0 0 30px hsl(104 48% 45% / 0.3);
