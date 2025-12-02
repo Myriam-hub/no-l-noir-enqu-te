@@ -1,1 +1,4 @@
 project_id = "gymcneistfprympxrybr"
+
+[functions.verify-admin]
+verify_jwt = false
