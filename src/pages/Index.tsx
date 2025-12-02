@@ -1,53 +1,108 @@
-import { useState, useEffect } from 'react';
-import { Search, Snowflake, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, Snowflake, AlertTriangle, Clock } from 'lucide-react';
 import { Header } from '@/components/Header';
-import { ClueCard } from '@/components/ClueCard';
-import { PlayerLogin } from '@/components/PlayerLogin';
-import { DaySelector } from '@/components/DaySelector';
-import { useGameStore } from '@/hooks/useGameStore';
+import { GameClueCard } from '@/components/GameClueCard';
+import { PlayerSelector } from '@/components/PlayerSelector';
+import { useSupabaseGame, Answer } from '@/hooks/useSupabaseGame';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
-  const [currentPlayer, setCurrentPlayer] = useState<string | null>(null);
-  const [playerId, setPlayerId] = useState<string | null>(null);
-  
-  const {
-    state,
-    getCurrentDayClues,
-    addPlayer,
-    submitGuess,
-    setCurrentDay,
-    hasPlayerGuessedClue,
-  } = useGameStore();
+  const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null);
+  const [currentPlayerName, setCurrentPlayerName] = useState<string | null>(null);
+  const [hasCompletedToday, setHasCompletedToday] = useState(false);
+  const [playerAnswers, setPlayerAnswers] = useState<Answer[]>([]);
 
+  const {
+    players,
+    todayClues,
+    loading,
+    getPlayerTodayAnswers,
+    hasPlayerCompletedToday,
+    submitAnswer,
+  } = useSupabaseGame();
+
+  // Load saved player from localStorage
   useEffect(() => {
-    const savedPlayer = localStorage.getItem('mystery-current-player');
-    const savedPlayerId = localStorage.getItem('mystery-current-player-id');
-    if (savedPlayer && savedPlayerId) {
-      setCurrentPlayer(savedPlayer);
-      setPlayerId(savedPlayerId);
+    const savedPlayerId = localStorage.getItem('mystery-player-id');
+    const savedPlayerName = localStorage.getItem('mystery-player-name');
+    if (savedPlayerId && savedPlayerName) {
+      setCurrentPlayerId(savedPlayerId);
+      setCurrentPlayerName(savedPlayerName);
     }
   }, []);
 
-  const handleLogin = (name: string) => {
-    const player = addPlayer(name);
-    setCurrentPlayer(name);
-    setPlayerId(player.id);
-    localStorage.setItem('mystery-current-player', name);
-    localStorage.setItem('mystery-current-player-id', player.id);
+  // Check if player has completed today and get their answers
+  const checkPlayerStatus = useCallback(async () => {
+    if (currentPlayerId) {
+      const completed = await hasPlayerCompletedToday(currentPlayerId);
+      setHasCompletedToday(completed);
+      const answers = await getPlayerTodayAnswers(currentPlayerId);
+      setPlayerAnswers(answers);
+    }
+  }, [currentPlayerId, hasPlayerCompletedToday, getPlayerTodayAnswers]);
+
+  useEffect(() => {
+    checkPlayerStatus();
+  }, [checkPlayerStatus]);
+
+  const handleSelectPlayer = async (playerId: string, playerName: string) => {
+    setCurrentPlayerId(playerId);
+    setCurrentPlayerName(playerName);
+    localStorage.setItem('mystery-player-id', playerId);
+    localStorage.setItem('mystery-player-name', playerName);
+
+    // Check completion status immediately
+    const completed = await hasPlayerCompletedToday(playerId);
+    setHasCompletedToday(completed);
+    const answers = await getPlayerTodayAnswers(playerId);
+    setPlayerAnswers(answers);
   };
 
-  const handleSubmitGuess = (clueId: string, guess: string): boolean => {
-    if (!playerId) return false;
-    return submitGuess(playerId, clueId, guess);
+  const handleSubmitGuess = async (clueId: string, guess: string) => {
+    if (!currentPlayerId) return { success: false, isCorrect: false };
+
+    const clue = todayClues.find(c => c.id === clueId);
+    if (!clue) return { success: false, isCorrect: false };
+
+    const result = await submitAnswer(currentPlayerId, clueId, guess, clue);
+
+    if (result.success) {
+      // Refresh player status
+      await checkPlayerStatus();
+    }
+
+    return result;
   };
 
-  const currentClues = getCurrentDayClues();
-  const maxDay = Math.max(...state.clues.map(c => c.day), 1);
+  const handleChangePlayer = () => {
+    setCurrentPlayerId(null);
+    setCurrentPlayerName(null);
+    setHasCompletedToday(false);
+    setPlayerAnswers([]);
+    localStorage.removeItem('mystery-player-id');
+    localStorage.removeItem('mystery-player-name');
+  };
+
+  const getAnswerForClue = (clueId: string) => {
+    return playerAnswers.find(a => a.clue_id === clueId);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background vignette flex items-center justify-center">
+        <div className="text-center">
+          <Search className="w-12 h-12 text-accent animate-pulse mx-auto mb-4" />
+          <p className="font-typewriter text-muted-foreground">Chargement de l'enquête...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background vignette">
       <Header />
-      
+
       {/* Hero Section */}
       <section className="relative pt-24 pb-12 overflow-hidden">
         {/* Floating snowflakes */}
@@ -76,12 +131,12 @@ const Index = () => {
                 Dossier Classé Confidentiel
               </span>
             </div>
-            
+
             <h1 className="text-4xl md:text-6xl font-typewriter text-accent mb-4 tracking-wider">
               Le Mystère du Personnel
             </h1>
             <p className="text-xl text-foreground/80 font-serif italic max-w-2xl mx-auto">
-              Enquête de Noël — Chaque jour, deux nouveaux indices vous mèneront 
+              Enquête de Noël — Chaque jour, deux nouveaux indices vous mèneront
               vers l'identité mystérieuse d'un membre de l'équipe.
             </p>
 
@@ -93,14 +148,24 @@ const Index = () => {
             </div>
           </div>
 
-          {/* Day selector and Player login */}
-          <div className="max-w-md mx-auto space-y-6 mb-12">
-            <DaySelector
-              currentDay={state.currentDay}
-              maxDay={maxDay}
-              onDayChange={setCurrentDay}
+          {/* Player selector */}
+          <div className="max-w-md mx-auto space-y-4 mb-12">
+            <PlayerSelector
+              players={players}
+              onSelectPlayer={handleSelectPlayer}
+              currentPlayer={currentPlayerName}
+              hasCompletedToday={hasCompletedToday}
             />
-            <PlayerLogin onLogin={handleLogin} currentPlayer={currentPlayer} />
+            {currentPlayerName && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleChangePlayer}
+                className="w-full text-muted-foreground"
+              >
+                Changer de joueur
+              </Button>
+            )}
           </div>
         </div>
       </section>
@@ -108,18 +173,38 @@ const Index = () => {
       {/* Clues Section */}
       <section className="pb-24">
         <div className="container mx-auto px-4">
+          {/* Already completed message */}
+          {hasCompletedToday && currentPlayerId && (
+            <Card className="max-w-2xl mx-auto mb-8 bg-eranove-green/10 border-eranove-green/30">
+              <CardContent className="p-6 text-center">
+                <Clock className="w-12 h-12 text-eranove-green mx-auto mb-4" />
+                <h3 className="font-typewriter text-xl text-eranove-green mb-2">
+                  PARTICIPATION TERMINÉE
+                </h3>
+                <p className="text-foreground/80 font-serif">
+                  Tu as déjà participé aujourd'hui, reviens demain pour de nouveaux indices !
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            {currentClues.length > 0 ? (
-              currentClues.map((clue, index) => (
-                <ClueCard
-                  key={clue.id}
-                  clue={clue}
-                  clueIndex={index}
-                  onSubmitGuess={handleSubmitGuess}
-                  hasGuessed={playerId ? hasPlayerGuessedClue(playerId, clue.id) : false}
-                  playerName={currentPlayer || ''}
-                />
-              ))
+            {todayClues.length > 0 ? (
+              todayClues.map((clue, index) => {
+                const answer = getAnswerForClue(clue.id);
+                return (
+                  <GameClueCard
+                    key={clue.id}
+                    clue={clue}
+                    clueIndex={index}
+                    players={players}
+                    onSubmitGuess={handleSubmitGuess}
+                    hasAnswered={!!answer}
+                    wasCorrect={answer?.is_correct}
+                    playerName={currentPlayerName}
+                  />
+                );
+              })
             ) : (
               <div className="col-span-2 text-center py-16">
                 <div className="inline-block p-8 bg-card/50 rounded-sm border border-border">
@@ -128,7 +213,7 @@ const Index = () => {
                     AUCUN INDICE DISPONIBLE
                   </h3>
                   <p className="text-muted-foreground/70 font-serif">
-                    Les enquêteurs n'ont pas encore révélé les indices du jour {state.currentDay}.
+                    Les enquêteurs n'ont pas encore révélé les indices du jour.
                   </p>
                 </div>
               </div>
@@ -152,11 +237,11 @@ const Index = () => {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-gold">•</span>
-                Chaque bonne réponse rapporte 10 points
+                Chaque bonne réponse rapporte 1 point
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-gold">•</span>
-                Consultez le classement pour voir votre position
+                Une seule participation par jour (2 réponses maximum)
               </li>
             </ul>
           </div>
