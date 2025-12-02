@@ -14,7 +14,96 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      answers: {
+        Row: {
+          clue_id: string
+          created_at: string
+          day: string
+          id: string
+          is_correct: boolean
+          player_id: string
+          response: string
+        }
+        Insert: {
+          clue_id: string
+          created_at?: string
+          day: string
+          id?: string
+          is_correct?: boolean
+          player_id: string
+          response: string
+        }
+        Update: {
+          clue_id?: string
+          created_at?: string
+          day?: string
+          id?: string
+          is_correct?: boolean
+          player_id?: string
+          response?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "answers_clue_id_fkey"
+            columns: ["clue_id"]
+            isOneToOne: false
+            referencedRelation: "clues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answers_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clues: {
+        Row: {
+          answer: string
+          clue_number: number
+          created_at: string
+          day: string
+          id: string
+          text: string
+        }
+        Insert: {
+          answer: string
+          clue_number: number
+          created_at?: string
+          day: string
+          id?: string
+          text: string
+        }
+        Update: {
+          answer?: string
+          clue_number?: number
+          created_at?: string
+          day?: string
+          id?: string
+          text?: string
+        }
+        Relationships: []
+      }
+      players: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
