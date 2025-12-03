@@ -21,7 +21,7 @@ export type Database = {
           day: string
           id: string
           is_correct: boolean
-          player_id: string
+          player_id: string | null
           player_name: string | null
           response: string
         }
@@ -31,7 +31,7 @@ export type Database = {
           day: string
           id?: string
           is_correct?: boolean
-          player_id: string
+          player_id?: string | null
           player_name?: string | null
           response: string
         }
@@ -41,7 +41,7 @@ export type Database = {
           day?: string
           id?: string
           is_correct?: boolean
-          player_id?: string
+          player_id?: string | null
           player_name?: string | null
           response?: string
         }
@@ -51,13 +51,6 @@ export type Database = {
             columns: ["clue_id"]
             isOneToOne: false
             referencedRelation: "clues"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "answers_player_id_fkey"
-            columns: ["player_id"]
-            isOneToOne: false
-            referencedRelation: "players"
             referencedColumns: ["id"]
           },
         ]
