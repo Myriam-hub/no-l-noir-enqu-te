@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Save, X, FileText, Lock, Users, Trophy, Calendar, AlertCircle, Settings, Eye, EyeOff } from 'lucide-react';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { Plus, Trash2, Edit2, Save, X, FileText, Lock, Users, Trophy, Calendar as CalendarIcon, AlertCircle, Settings, Eye, EyeOff } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAdminGame, Secret } from '@/hooks/useAdminGame';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -20,6 +24,7 @@ const Admin = () => {
     secrets,
     dailySecrets,
     gameStats,
+    gameConfig,
     leaderboard,
     allGuesses,
     currentDay,
@@ -32,17 +37,28 @@ const Admin = () => {
     updateClue,
     deleteClue,
     setDaySecrets,
+    updateGameConfig,
     refreshStats,
   } = useAdminGame(storedAdminCode);
 
   const { toast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'stats' | 'secrets' | 'days'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'secrets' | 'settings'>('stats');
   const [isAddingSecret, setIsAddingSecret] = useState(false);
   const [newSecret, setNewSecret] = useState({ title: '', person_name: '' });
   const [editingSecretId, setEditingSecretId] = useState<string | null>(null);
   const [editSecretForm, setEditSecretForm] = useState({ title: '', person_name: '' });
   const [newClueText, setNewClueText] = useState<Record<string, string>>({});
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
+
+  // Initialize dates from gameConfig
+  useEffect(() => {
+    if (gameConfig) {
+      setStartDate(new Date(gameConfig.start_date));
+      setEndDate(new Date(gameConfig.end_date));
+    }
+  }, [gameConfig]);
 
   // Load admin data when authenticated
   useEffect(() => {
@@ -247,11 +263,11 @@ const Admin = () => {
               Secrets ({secrets.length}/20)
             </Button>
             <Button
-              variant={activeTab === 'days' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('days')}
+              variant={activeTab === 'settings' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('settings')}
             >
-              <Calendar className="w-4 h-4 mr-2" />
-              Journées
+              <Settings className="w-4 h-4 mr-2" />
+              Paramètres
             </Button>
           </div>
         </div>
@@ -478,92 +494,106 @@ const Admin = () => {
           </div>
         )}
 
-        {/* Days Tab */}
-        {activeTab === 'days' && (
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
           <div className="max-w-5xl mx-auto space-y-4">
-            <Card className="bg-card/80 backdrop-blur-sm">
+            <Card className="bg-card border-border">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-accent" />
-                  Configuration des 10 Journées
+                  <CalendarIcon className="w-5 h-5 text-primary" />
+                  Configuration des Dates du Jeu
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((day) => {
-                    const config = getDayConfig(day);
-                    const secret1 = getSecretById(config?.secret1_id || null);
-                    const secret2 = getSecretById(config?.secret2_id || null);
-                    const isToday = day === currentDay;
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Start Date */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Date de début
+                    </label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !startDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {startDate ? format(startDate, "PPP", { locale: fr }) : "Sélectionner une date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={startDate}
+                          onSelect={setStartDate}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
 
-                    return (
-                      <div
-                        key={day}
-                        className={cn(
-                          "p-4 rounded-sm border",
-                          isToday ? "bg-accent/10 border-accent/30" : "bg-secondary/30 border-border"
-                        )}
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-typewriter text-lg">
-                            JOUR {day}
-                            {isToday && (
-                              <span className="ml-2 text-xs bg-accent text-background px-2 py-1 rounded">
-                                AUJOURD'HUI
-                              </span>
-                            )}
-                          </h4>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-xs text-muted-foreground font-typewriter block mb-1">
-                              SECRET 1
-                            </label>
-                            <select
-                              value={config?.secret1_id || ''}
-                              onChange={(e) => handleSetDaySecrets(day, e.target.value || null, config?.secret2_id || null)}
-                              className="w-full p-2 rounded-sm bg-secondary/50 border border-border text-sm"
-                            >
-                              <option value="">-- Non défini --</option>
-                              {secrets.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                  {s.title} ({s.person_name})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground font-typewriter block mb-1">
-                              SECRET 2
-                            </label>
-                            <select
-                              value={config?.secret2_id || ''}
-                              onChange={(e) => handleSetDaySecrets(day, config?.secret1_id || null, e.target.value || null)}
-                              className="w-full p-2 rounded-sm bg-secondary/50 border border-border text-sm"
-                            >
-                              <option value="">-- Non défini --</option>
-                              {secrets.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                  {s.title} ({s.person_name})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        {(secret1 || secret2) && (
-                          <div className="mt-3 pt-3 border-t border-border/50 text-sm text-muted-foreground">
-                            <Eye className="w-4 h-4 inline mr-1" />
-                            {secret1 && <span className="text-accent">{secret1.title}</span>}
-                            {secret1 && secret2 && ' & '}
-                            {secret2 && <span className="text-accent">{secret2.title}</span>}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {/* End Date */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Date de fin
+                    </label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !endDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {endDate ? format(endDate, "PPP", { locale: fr }) : "Sélectionner une date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={endDate}
+                          onSelect={setEndDate}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
+
+                <Button
+                  onClick={async () => {
+                    if (!startDate || !endDate) {
+                      toast({ title: 'Erreur', description: 'Veuillez sélectionner les deux dates', variant: 'destructive' });
+                      return;
+                    }
+                    const result = await updateGameConfig(
+                      format(startDate, 'yyyy-MM-dd'),
+                      format(endDate, 'yyyy-MM-dd')
+                    );
+                    if (result.success) {
+                      toast({ title: 'Dates mises à jour', description: 'La configuration du jeu a été sauvegardée.' });
+                    } else {
+                      toast({ title: 'Erreur', description: result.error, variant: 'destructive' });
+                    }
+                  }}
+                  className="mt-6 w-full md:w-auto"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Sauvegarder les dates
+                </Button>
+
+                {gameConfig && (
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    Configuration actuelle : du {format(new Date(gameConfig.start_date), "d MMMM yyyy", { locale: fr })} au {format(new Date(gameConfig.end_date), "d MMMM yyyy", { locale: fr })}
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>

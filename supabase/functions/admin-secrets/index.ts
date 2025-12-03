@@ -184,6 +184,59 @@ serve(async (req) => {
         );
       }
 
+      case "getGameConfig": {
+        const { data, error } = await supabase
+          .from("game_config")
+          .select("*")
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        return new Response(
+          JSON.stringify({ success: true, config: data }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "updateGameConfig": {
+        const { startDate, endDate } = await req.json().then(b => b);
+        
+        // Get existing config or create new
+        const { data: existing } = await supabase
+          .from("game_config")
+          .select("id")
+          .limit(1)
+          .maybeSingle();
+
+        let result;
+        if (existing) {
+          result = await supabase
+            .from("game_config")
+            .update({ 
+              start_date: startDate, 
+              end_date: endDate,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", existing.id)
+            .select()
+            .single();
+        } else {
+          result = await supabase
+            .from("game_config")
+            .insert({ start_date: startDate, end_date: endDate })
+            .select()
+            .single();
+        }
+
+        if (result.error) throw result.error;
+
+        return new Response(
+          JSON.stringify({ success: true, config: result.data }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       default:
         return new Response(
           JSON.stringify({ success: false, error: "Action inconnue" }),
