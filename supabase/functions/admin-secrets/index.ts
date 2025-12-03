@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, adminCode, secret, secretId, clueId, clueText, day, secretIds } = await req.json();
+    const { action, adminCode, secret, secretId, clueId, clueText, day, secretIds, startDate, endDate } = await req.json();
 
     // Verify admin code
     const expectedCode = Deno.env.get("ADMIN_CODE");
@@ -200,7 +200,6 @@ serve(async (req) => {
       }
 
       case "updateGameConfig": {
-        const { startDate, endDate } = await req.json().then(b => b);
         
         // Get existing config or create new
         const { data: existing } = await supabase
