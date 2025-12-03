@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { adminCode, day } = await req.json();
+    const { adminCode } = await req.json();
 
     // Verify admin code
     const expectedCode = Deno.env.get("ADMIN_CODE");
@@ -35,56 +35,51 @@ serve(async (req) => {
 
     if (guessesError) throw guessesError;
 
-    // Get daily config
-    const { data: dailyConfig, error: dailyError } = await supabase
-      .from("daily_secrets")
-      .select("*")
-      .eq("day", day)
-      .maybeSingle();
+    // Get all secrets to see first_found_by
+    const { data: allSecrets, error: secretsError } = await supabase
+      .from("secrets")
+      .select("*");
 
-    if (dailyError) throw dailyError;
+    if (secretsError) throw secretsError;
 
-    // Filter guesses for today
-    const todayGuesses = allGuesses?.filter(g => g.day === day) || [];
+    // Calculate unique players
+    const uniquePlayers = [...new Set(allGuesses?.map(g => g.player_name) || [])];
 
-    // Count guesses per player for today
-    const playerGuessCount: Record<string, number> = {};
-    todayGuesses.forEach(g => {
-      playerGuessCount[g.player_name] = (playerGuessCount[g.player_name] || 0) + 1;
+    // Count secrets found by each player (first finder only = 1 point each)
+    const playerScores: Record<string, number> = {};
+    allSecrets?.forEach(s => {
+      if (s.first_found_by) {
+        playerScores[s.first_found_by] = (playerScores[s.first_found_by] || 0) + 1;
+      }
     });
 
-    // Players who completed both secrets today
-    const completedPlayers = Object.entries(playerGuessCount)
-      .filter(([_, count]) => count >= 2)
-      .map(([name]) => name);
-
-    // Players who only did 1 secret
-    const partialPlayers = Object.entries(playerGuessCount)
-      .filter(([_, count]) => count === 1)
-      .map(([name]) => name);
-
-    // Calculate leaderboard (10 points per correct guess)
-    const playerScores: Record<string, number> = {};
-    allGuesses?.forEach(g => {
-      if (!playerScores[g.player_name]) playerScores[g.player_name] = 0;
-      if (g.is_correct) playerScores[g.player_name] += 10;
+    // Add players with 0 points who have guessed but not found any
+    uniquePlayers.forEach(p => {
+      if (!(p in playerScores)) {
+        playerScores[p] = 0;
+      }
     });
 
     const leaderboard = Object.entries(playerScores)
       .map(([name, score]) => ({ name, score }))
       .sort((a, b) => b.score - a.score);
 
+    // Stats: secrets found vs total
+    const secretsFound = allSecrets?.filter(s => s.first_found_by).length || 0;
+    const totalSecrets = allSecrets?.length || 0;
+
     return new Response(
       JSON.stringify({
         success: true,
-        todayStats: {
-          completedPlayers,
-          partialPlayers,
-          totalGuessesToday: todayGuesses.length,
+        stats: {
+          totalPlayers: uniquePlayers.length,
+          secretsFound,
+          totalSecrets,
+          totalGuesses: allGuesses?.length || 0,
         },
         leaderboard,
-        todayGuesses,
-        dailyConfig,
+        allGuesses,
+        allSecrets,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

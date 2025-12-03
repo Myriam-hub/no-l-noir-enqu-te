@@ -6,6 +6,8 @@ export interface Secret {
   title: string;
   person_name: string;
   is_active: boolean;
+  first_found_by: string | null;
+  first_found_at: string | null;
   clues: Clue[];
 }
 
@@ -22,75 +24,52 @@ export interface Guess {
   day: number;
   guess_name: string;
   is_correct: boolean;
+  is_first_finder: boolean;
   created_at: string;
 }
 
-export interface DailySecrets {
-  day: number;
-  secret1_id: string | null;
-  secret2_id: string | null;
+export interface GameConfig {
+  id: string;
+  start_date: string;
+  end_date: string;
 }
 
 export const useGame = () => {
-  const [todaySecrets, setTodaySecrets] = useState<Secret[]>([]);
-  const [currentDay, setCurrentDay] = useState<number>(1);
+  const [allSecrets, setAllSecrets] = useState<Secret[]>([]);
+  const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Calculate the game day (1-10) based on a start date
-  const calculateGameDay = useCallback(() => {
-    // Game starts December 1st, 2024 (adjust as needed)
-    const startDate = new Date('2024-12-01');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    startDate.setHours(0, 0, 0, 0);
-    
-    const diffTime = today.getTime() - startDate.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    
-    // Clamp between 1 and 10
-    return Math.max(1, Math.min(10, diffDays));
-  }, []);
-
-  // Fetch today's secrets
-  const fetchTodaySecrets = useCallback(async () => {
+  // Fetch all active secrets
+  const fetchSecrets = useCallback(async () => {
     setLoading(true);
     try {
-      const day = calculateGameDay();
-      setCurrentDay(day);
-
-      // Get daily secrets config for today
-      const { data: dailyConfig, error: dailyError } = await supabase
-        .from('daily_secrets')
+      // Fetch game config
+      const { data: config } = await supabase
+        .from('game_config')
         .select('*')
-        .eq('day', day)
+        .limit(1)
         .maybeSingle();
 
-      if (dailyError) throw dailyError;
-
-      if (!dailyConfig || (!dailyConfig.secret1_id && !dailyConfig.secret2_id)) {
-        setTodaySecrets([]);
-        return;
+      if (config) {
+        setGameConfig(config);
       }
 
-      // Get the secret IDs for today
-      const secretIds = [dailyConfig.secret1_id, dailyConfig.secret2_id].filter(Boolean);
-
-      if (secretIds.length === 0) {
-        setTodaySecrets([]);
-        return;
-      }
-
-      // Fetch secrets
+      // Fetch all active secrets
       const { data: secrets, error: secretsError } = await supabase
         .from('secrets')
         .select('*')
-        .in('id', secretIds)
         .eq('is_active', true);
 
       if (secretsError) throw secretsError;
 
-      // Fetch clues for these secrets
+      if (!secrets || secrets.length === 0) {
+        setAllSecrets([]);
+        return;
+      }
+
+      // Fetch all clues for these secrets
+      const secretIds = secrets.map(s => s.id);
       const { data: clues, error: cluesError } = await supabase
         .from('clues')
         .select('*')
@@ -99,54 +78,43 @@ export const useGame = () => {
       if (cluesError) throw cluesError;
 
       // Combine secrets with their clues
-      const secretsWithClues = secrets?.map(s => ({
+      const secretsWithClues = secrets.map(s => ({
         ...s,
         clues: clues?.filter(c => c.secret_id === s.id) || []
-      })) || [];
+      }));
 
-      setTodaySecrets(secretsWithClues);
+      setAllSecrets(secretsWithClues);
     } catch (err) {
-      console.error('Error fetching today secrets:', err);
+      console.error('Error fetching secrets:', err);
       setError(err instanceof Error ? err.message : 'Erreur');
     } finally {
       setLoading(false);
     }
-  }, [calculateGameDay]);
+  }, []);
 
-  // Get player's guesses for today
+  // Get player's guesses
   const getPlayerGuesses = useCallback(async (playerName: string): Promise<Guess[]> => {
-    const day = calculateGameDay();
-    
     const { data, error } = await supabase
       .from('guesses')
       .select('*')
-      .eq('player_name', playerName)
-      .eq('day', day);
+      .eq('player_name', playerName);
 
     if (error) {
       console.error('Error fetching player guesses:', error);
       return [];
     }
 
-    return data || [];
-  }, [calculateGameDay]);
-
-  // Check if player has completed today
-  const hasPlayerCompletedToday = useCallback(async (playerName: string): Promise<boolean> => {
-    const guesses = await getPlayerGuesses(playerName);
-    return guesses.length >= 2;
-  }, [getPlayerGuesses]);
+    return (data || []) as Guess[];
+  }, []);
 
   // Submit a guess
   const submitGuess = useCallback(async (
     playerName: string,
     secretId: string,
     guessName: string
-  ): Promise<{ success: boolean; isCorrect?: boolean; error?: string }> => {
-    const day = calculateGameDay();
-
+  ): Promise<{ success: boolean; isCorrect?: boolean; isFirstFinder?: boolean; error?: string }> => {
     const { data, error } = await supabase.functions.invoke('submit-guess', {
-      body: { playerName, secretId, guessName, day },
+      body: { playerName, secretId, guessName, day: 1 },
     });
 
     if (error) {
@@ -158,21 +126,23 @@ export const useGame = () => {
       return { success: false, error: data.error };
     }
 
-    return { success: true, isCorrect: data.isCorrect };
-  }, [calculateGameDay]);
+    // Refresh secrets to get updated first_found_by
+    await fetchSecrets();
+
+    return { success: true, isCorrect: data.isCorrect, isFirstFinder: data.isFirstFinder };
+  }, [fetchSecrets]);
 
   useEffect(() => {
-    fetchTodaySecrets();
-  }, [fetchTodaySecrets]);
+    fetchSecrets();
+  }, [fetchSecrets]);
 
   return {
-    todaySecrets,
-    currentDay,
+    allSecrets,
+    gameConfig,
     loading,
     error,
     getPlayerGuesses,
-    hasPlayerCompletedToday,
     submitGuess,
-    refreshSecrets: fetchTodaySecrets,
+    refreshSecrets: fetchSecrets,
   };
 };

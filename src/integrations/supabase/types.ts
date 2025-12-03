@@ -82,6 +82,30 @@ export type Database = {
           },
         ]
       }
+      game_config: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       guesses: {
         Row: {
           created_at: string
@@ -89,6 +113,7 @@ export type Database = {
           guess_name: string
           id: string
           is_correct: boolean
+          is_first_finder: boolean | null
           player_name: string
           secret_id: string
         }
@@ -98,6 +123,7 @@ export type Database = {
           guess_name: string
           id?: string
           is_correct?: boolean
+          is_first_finder?: boolean | null
           player_name: string
           secret_id: string
         }
@@ -107,6 +133,7 @@ export type Database = {
           guess_name?: string
           id?: string
           is_correct?: boolean
+          is_first_finder?: boolean | null
           player_name?: string
           secret_id?: string
         }
@@ -141,6 +168,8 @@ export type Database = {
       secrets: {
         Row: {
           created_at: string
+          first_found_at: string | null
+          first_found_by: string | null
           id: string
           is_active: boolean
           person_name: string
@@ -148,6 +177,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          first_found_at?: string | null
+          first_found_by?: string | null
           id?: string
           is_active?: boolean
           person_name: string
@@ -155,6 +186,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          first_found_at?: string | null
+          first_found_by?: string | null
           id?: string
           is_active?: boolean
           person_name?: string
