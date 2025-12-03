@@ -6,6 +6,7 @@ export interface Secret {
   title: string;
   person_name: string;
   is_active: boolean;
+  first_found_by?: string | null;
   created_at: string;
   clues: Clue[];
 }
@@ -31,6 +32,12 @@ export interface GameStats {
   totalGuesses: number;
 }
 
+export interface GameConfig {
+  id: string;
+  start_date: string;
+  end_date: string;
+}
+
 export interface LeaderboardEntry {
   name: string;
   score: number;
@@ -40,6 +47,7 @@ export const useAdminGame = (adminCode: string) => {
   const [secrets, setSecrets] = useState<Secret[]>([]);
   const [dailySecrets, setDailySecrets] = useState<DailySecrets[]>([]);
   const [gameStats, setGameStats] = useState<GameStats | null>(null);
+  const [gameConfig, setGameConfig] = useState<GameConfig | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [allGuesses, setAllGuesses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +75,16 @@ export const useAdminGame = (adminCode: string) => {
     }
   }, [adminCode]);
 
+  const fetchGameConfig = useCallback(async () => {
+    if (!adminCode) return;
+    const { data } = await supabase.functions.invoke('admin-secrets', {
+      body: { action: 'getGameConfig', adminCode },
+    });
+    if (data?.success) {
+      setGameConfig(data.config);
+    }
+  }, [adminCode]);
+
   const fetchStats = useCallback(async () => {
     if (!adminCode) return;
     const { data } = await supabase.functions.invoke('admin-stats', {
@@ -81,9 +99,19 @@ export const useAdminGame = (adminCode: string) => {
 
   const loadAdminData = useCallback(async () => {
     setLoading(true);
-    await Promise.all([fetchSecrets(), fetchStats()]);
+    await Promise.all([fetchSecrets(), fetchStats(), fetchGameConfig()]);
     setLoading(false);
-  }, [fetchSecrets, fetchStats]);
+  }, [fetchSecrets, fetchStats, fetchGameConfig]);
+
+  const updateGameConfig = useCallback(async (startDate: string, endDate: string) => {
+    const { data, error } = await supabase.functions.invoke('admin-secrets', {
+      body: { action: 'updateGameConfig', adminCode, startDate, endDate },
+    });
+    if (error) return { success: false, error: error.message };
+    if (!data?.success) return { success: false, error: data?.error };
+    await fetchGameConfig();
+    return { success: true };
+  }, [adminCode, fetchGameConfig]);
 
   const addSecret = useCallback(async (title: string, personName: string) => {
     const { data, error } = await supabase.functions.invoke('admin-secrets', {
@@ -156,8 +184,8 @@ export const useAdminGame = (adminCode: string) => {
   }, [adminCode, fetchSecrets]);
 
   return {
-    secrets, dailySecrets, gameStats, leaderboard, allGuesses, currentDay, loading,
+    secrets, dailySecrets, gameStats, gameConfig, leaderboard, allGuesses, currentDay, loading,
     loadAdminData, addSecret, updateSecret, deleteSecret, addClue, updateClue, deleteClue,
-    setDaySecrets, refreshStats: fetchStats,
+    setDaySecrets, updateGameConfig, refreshStats: fetchStats,
   };
 };
