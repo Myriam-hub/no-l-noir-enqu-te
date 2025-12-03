@@ -2,19 +2,8 @@ import { useState } from 'react';
 import { FileText, Send, Check, X, Lock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-
-interface Player {
-  id: string;
-  name: string;
-}
 
 interface Clue {
   id: string;
@@ -27,8 +16,7 @@ interface Clue {
 interface GameClueCardProps {
   clue: Clue;
   clueIndex: number;
-  players: Player[];
-  onSubmitGuess: (clueId: string, guess: string) => Promise<{ success: boolean; isCorrect: boolean }>;
+  onSubmitGuess: (clueId: string, guess: string) => Promise<{ success: boolean; isCorrect: boolean; error?: string }>;
   hasAnswered: boolean;
   wasCorrect?: boolean;
   playerName: string | null;
@@ -37,26 +25,33 @@ interface GameClueCardProps {
 export const GameClueCard = ({
   clue,
   clueIndex,
-  players,
   onSubmitGuess,
   hasAnswered,
   wasCorrect,
   playerName,
 }: GameClueCardProps) => {
-  const [selectedAnswer, setSelectedAnswer] = useState<string>('');
+  const [answer, setAnswer] = useState('');
   const [result, setResult] = useState<'correct' | 'incorrect' | null>(
     hasAnswered ? (wasCorrect ? 'correct' : 'incorrect') : null
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedAnswer || !playerName || hasAnswered) return;
+    if (!answer.trim() || !playerName || hasAnswered) return;
 
     setIsSubmitting(true);
+    setError('');
 
-    const { isCorrect } = await onSubmitGuess(clue.id, selectedAnswer);
-    setResult(isCorrect ? 'correct' : 'incorrect');
+    const response = await onSubmitGuess(clue.id, answer.trim());
+    
+    if (response.success) {
+      setResult(response.isCorrect ? 'correct' : 'incorrect');
+    } else {
+      setError(response.error || 'Une erreur est survenue');
+    }
+    
     setIsSubmitting(false);
   };
 
@@ -115,30 +110,30 @@ export const GameClueCard = ({
         {!hasAnswered ? (
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="relative">
-              <Select value={selectedAnswer} onValueChange={setSelectedAnswer} disabled={!playerName || isSubmitting}>
-                <SelectTrigger className="bg-secondary/30 border-ink/20 text-ink">
-                  <SelectValue placeholder="Sélectionnez un collègue..." />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-accent/30 z-50 max-h-60">
-                  {players.map((player) => (
-                    <SelectItem key={player.id} value={player.name} className="focus:bg-accent/20">
-                      {player.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                placeholder="Entrez le nom du collègue..."
+                disabled={!playerName || isSubmitting}
+                className="bg-secondary/30 border-ink/20 text-ink"
+                maxLength={100}
+              />
               {!playerName && (
-                <div className="absolute right-10 top-1/2 -translate-y-1/2">
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
                   <Lock className="w-4 h-4 text-muted-foreground" />
                 </div>
               )}
             </div>
 
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
+
             <Button
               type="submit"
               variant="paper"
               className="w-full"
-              disabled={!selectedAnswer || !playerName || isSubmitting}
+              disabled={!answer.trim() || !playerName || isSubmitting}
             >
               {isSubmitting ? (
                 <span className="animate-pulse">Vérification...</span>

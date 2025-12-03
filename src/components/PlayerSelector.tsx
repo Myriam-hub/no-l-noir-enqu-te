@@ -2,42 +2,38 @@ import { useState } from 'react';
 import { User, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-
-interface Player {
-  id: string;
-  name: string;
-}
+import { Input } from '@/components/ui/input';
 
 interface PlayerSelectorProps {
-  players: Player[];
-  onSelectPlayer: (playerId: string, playerName: string) => void;
+  onSelectPlayer: (playerName: string) => void;
   currentPlayer: string | null;
   hasCompletedToday: boolean;
 }
 
 export const PlayerSelector = ({
-  players,
   onSelectPlayer,
   currentPlayer,
   hasCompletedToday,
 }: PlayerSelectorProps) => {
-  const [selectedId, setSelectedId] = useState<string>('');
+  const [playerName, setPlayerName] = useState('');
+  const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedId) {
-      const player = players.find(p => p.id === selectedId);
-      if (player) {
-        onSelectPlayer(player.id, player.name);
-      }
+    const trimmed = playerName.trim();
+    
+    if (trimmed.length < 2) {
+      setError('Le nom doit contenir au moins 2 caractères');
+      return;
     }
+    
+    if (trimmed.length > 50) {
+      setError('Le nom est trop long (max 50 caractères)');
+      return;
+    }
+    
+    setError('');
+    onSelectPlayer(trimmed);
   };
 
   if (currentPlayer) {
@@ -66,22 +62,20 @@ export const PlayerSelector = ({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <Select value={selectedId} onValueChange={setSelectedId}>
-            <SelectTrigger className="flex-1 bg-secondary/50 border-accent/30">
-              <SelectValue placeholder="Sélectionnez votre nom..." />
-            </SelectTrigger>
-            <SelectContent className="bg-card border-accent/30 z-50">
-              {players.map((player) => (
-                <SelectItem key={player.id} value={player.id} className="focus:bg-accent/20">
-                  {player.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button type="submit" variant="default" disabled={!selectedId}>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <Input
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            placeholder="Entrez votre prénom..."
+            className="bg-secondary/50 border-accent/30"
+            maxLength={50}
+          />
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+          <Button type="submit" variant="default" className="w-full" disabled={!playerName.trim()}>
             <LogIn className="w-4 h-4 mr-2" />
-            Commencer
+            Commencer l'enquête
           </Button>
         </form>
       </CardContent>
