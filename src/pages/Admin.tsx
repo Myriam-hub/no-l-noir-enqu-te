@@ -279,7 +279,7 @@ const Admin = () => {
             <Card className="bg-card border-border">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-primary" />
+                  <CalendarIcon className="w-5 h-5 text-primary" />
                   Résumé du Jeu
                 </CardTitle>
               </CardHeader>
