@@ -7,10 +7,10 @@
 @layer base {
   :root {
     /* Light theme - Eranove colors */
-    --background: 0 0% 100%;
+    --background: 0 0% 98%;
     --foreground: 207 63% 26%;
 
-    --card: 0 0% 98%;
+    --card: 0 0% 100%;
     --card-foreground: 207 63% 26%;
 
     --popover: 0 0% 100%;
@@ -22,7 +22,7 @@
     --secondary: 183 47% 48%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 207 20% 92%;
+    --muted: 207 20% 94%;
     --muted-foreground: 207 30% 45%;
 
     --accent: 104 48% 45%;
@@ -45,7 +45,7 @@
     --eranove-lime: 65 70% 44%;
     --eranove-yellow: 52 95% 55%;
 
-    --paper: 0 0% 98%;
+    --paper: 0 0% 100%;
     --paper-foreground: 207 63% 26%;
     --ink: 207 63% 26%;
     --stamp: 104 48% 40%;
@@ -59,6 +59,28 @@
     /* Shadows */
     --shadow-card: 0 4px 20px hsl(207 63% 26% / 0.08), 0 2px 8px hsl(207 63% 26% / 0.04);
     --shadow-glow: 0 0 30px hsl(104 48% 45% / 0.2);
+  }
+
+  .dark {
+    --background: 0 0% 98%;
+    --foreground: 207 63% 26%;
+    --card: 0 0% 100%;
+    --card-foreground: 207 63% 26%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 207 63% 26%;
+    --primary: 207 63% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 183 47% 48%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 207 20% 94%;
+    --muted-foreground: 207 30% 45%;
+    --accent: 104 48% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 207 30% 85%;
+    --input: 207 20% 92%;
+    --ring: 207 63% 40%;
   }
 }
 
