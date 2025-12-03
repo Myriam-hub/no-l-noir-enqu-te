@@ -1,4 +1,4 @@
-import { Search, Fingerprint } from 'lucide-react';
+import { Search, Gift, Fingerprint } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -6,7 +6,7 @@ export const Header = () => {
   const location = useLocation();
   
   const navItems = [
-    { path: '/', label: 'Enquête', icon: Search },
+    { path: '/', label: 'Jouer', icon: Search },
     { path: '/admin', label: 'Admin', icon: Fingerprint },
   ];
 
@@ -16,13 +16,13 @@ export const Header = () => {
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-3 group">
             <div className="relative">
-              <Search className="w-8 h-8 text-accent animate-flicker" />
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse" />
+              <Search className="w-8 h-8 text-primary" />
+              <Gift className="w-4 h-4 text-secondary absolute -bottom-1 -right-1" />
             </div>
             <div className="flex flex-col">
-              <span className="font-typewriter text-lg text-accent tracking-wider">DOSSIER N°2025</span>
+              <span className="font-semibold text-lg text-foreground">Mystère de Noël</span>
               <span className="text-xs text-muted-foreground -mt-1">
-                Enquête de Noël
+                Enquête du Personnel
               </span>
             </div>
           </Link>
@@ -33,10 +33,10 @@ export const Header = () => {
                 key={path}
                 to={path}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-sm font-typewriter text-sm uppercase tracking-wider transition-all duration-300",
+                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300",
                   location.pathname === path
-                    ? "bg-primary/20 text-primary border border-primary/30"
-                    : "text-muted-foreground hover:text-accent hover:bg-accent/10"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
               >
                 <Icon className="w-4 h-4" />

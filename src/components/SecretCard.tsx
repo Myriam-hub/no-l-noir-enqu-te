@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { FileText, Send, Check, X, Lock, ChevronDown, ChevronUp } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Send, Check, X, Lock, AlertTriangle, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -9,9 +8,10 @@ import type { Secret, Guess } from '@/hooks/useGame';
 interface SecretCardProps {
   secret: Secret;
   secretIndex: number;
-  onSubmitGuess: (secretId: string, guessName: string) => Promise<{ success: boolean; isCorrect?: boolean; error?: string }>;
+  onSubmitGuess: (secretId: string, guessName: string) => Promise<{ success: boolean; isCorrect?: boolean; isFirstFinder?: boolean; error?: string }>;
   existingGuess?: Guess;
   playerName: string | null;
+  onClose?: () => void;
 }
 
 export const SecretCard = ({
@@ -20,16 +20,17 @@ export const SecretCard = ({
   onSubmitGuess,
   existingGuess,
   playerName,
+  onClose,
 }: SecretCardProps) => {
   const [guessName, setGuessName] = useState('');
-  const [showClues, setShowClues] = useState(false);
-  const [result, setResult] = useState<'correct' | 'incorrect' | null>(
-    existingGuess ? (existingGuess.is_correct ? 'correct' : 'incorrect') : null
+  const [result, setResult] = useState<{ isCorrect: boolean; isFirstFinder: boolean } | null>(
+    existingGuess ? { isCorrect: existingGuess.is_correct, isFirstFinder: existingGuess.is_first_finder || false } : null
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const hasAnswered = !!existingGuess;
+  const isTaken = !!secret.first_found_by;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +42,7 @@ export const SecretCard = ({
     const response = await onSubmitGuess(secret.id, guessName.trim());
     
     if (response.success) {
-      setResult(response.isCorrect ? 'correct' : 'incorrect');
+      setResult({ isCorrect: response.isCorrect || false, isFirstFinder: response.isFirstFinder || false });
     } else {
       setError(response.error || 'Une erreur est survenue');
     }
@@ -50,147 +51,120 @@ export const SecretCard = ({
   };
 
   return (
-    <Card
-      className={cn(
-        "paper-texture case-file relative overflow-hidden transition-all duration-500 animate-fade-in",
-        result === 'correct' && "ring-2 ring-eranove-green/50",
-        result === 'incorrect' && "ring-2 ring-primary/50"
+    <div className="space-y-4">
+      {/* Taken warning */}
+      {isTaken && !hasAnswered && (
+        <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+          <AlertTriangle className="w-5 h-5 text-destructive" />
+          <span className="text-sm text-destructive">
+            Point déjà pris par <strong>{secret.first_found_by}</strong>
+          </span>
+        </div>
       )}
-      style={{ animationDelay: `${secretIndex * 200}ms` }}
-    >
-      {/* Paperclip decoration */}
-      <div className="absolute -top-2 left-8 w-6 h-12 bg-gradient-to-b from-gray-400 to-gray-500 rounded-full transform -rotate-12 shadow-md" />
 
-      {/* Top fold effect */}
-      <div className="absolute top-0 right-0 w-0 h-0 border-l-[40px] border-l-transparent border-t-[40px] border-t-background" />
+      {/* Secret title */}
+      <div className="bg-muted/50 p-4 rounded-lg border border-border">
+        <h3 className="text-foreground text-lg leading-relaxed font-medium mb-4">
+          "{secret.title}"
+        </h3>
+        
+        {/* Clues list */}
+        {secret.clues.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground mb-2">Indices :</p>
+            {secret.clues.map((clue, i) => (
+              <div key={clue.id} className="flex gap-2 text-sm">
+                <span className="text-primary font-semibold">#{i + 1}</span>
+                <span className="text-foreground">{clue.text}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">Aucun indice disponible.</p>
+        )}
+      </div>
 
-      <CardHeader className="relative pb-2">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-secondary/50 rounded-sm">
-              <FileText className="w-5 h-5 text-accent" />
-            </div>
-            <CardTitle className="text-ink text-xl">
-              SECRET #{secretIndex + 1}
-            </CardTitle>
+      {/* Guess form or result */}
+      {!hasAnswered ? (
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="relative">
+            <Input
+              value={guessName}
+              onChange={(e) => setGuessName(e.target.value)}
+              placeholder="À qui appartient ce secret ?"
+              disabled={!playerName || isSubmitting}
+              className="bg-background border-border"
+              maxLength={100}
+            />
+            {!playerName && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <Lock className="w-4 h-4 text-muted-foreground" />
+              </div>
+            )}
           </div>
 
-          {hasAnswered && (
-            <div className={cn(
-              "stamp animate-stamp",
-              result === 'correct' ? "text-eranove-green" : "text-primary"
-            )}>
-              <span className="font-typewriter text-lg border-2 border-current px-3 py-1 rounded-sm">
-                {result === 'correct' ? 'RÉSOLU' : 'RÉPONDU'}
-              </span>
-            </div>
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
           )}
-        </div>
 
-        <div className="mt-2 text-xs text-ink/60 font-typewriter">
-          DOSSIER CONFIDENTIEL
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Secret title */}
-        <div className="bg-paper/30 p-4 rounded-sm border border-ink/10">
-          <h3 className="text-ink text-lg leading-relaxed font-serif italic mb-2">
-            "{secret.title}"
-          </h3>
-          
-          {/* Toggle clues button */}
           <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowClues(!showClues)}
-            className="w-full justify-between text-muted-foreground hover:text-accent"
+            type="submit"
+            className="w-full"
+            disabled={!guessName.trim() || !playerName || isSubmitting}
           >
-            <span>{showClues ? 'Masquer les indices' : `Voir les indices (${secret.clues.length})`}</span>
-            {showClues ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </Button>
-          
-          {/* Clues list */}
-          {showClues && secret.clues.length > 0 && (
-            <div className="mt-3 space-y-2 border-t border-ink/10 pt-3">
-              {secret.clues.map((clue, i) => (
-                <div key={clue.id} className="flex gap-2 text-sm">
-                  <span className="text-accent font-typewriter">#{i + 1}</span>
-                  <span className="text-ink/80 font-serif">{clue.text}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          {showClues && secret.clues.length === 0 && (
-            <p className="mt-3 text-sm text-muted-foreground italic">Aucun indice supplémentaire.</p>
-          )}
-        </div>
-
-        {/* Guess form */}
-        {!hasAnswered ? (
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="relative">
-              <Input
-                value={guessName}
-                onChange={(e) => setGuessName(e.target.value)}
-                placeholder="À qui appartient ce secret ?"
-                disabled={!playerName || isSubmitting}
-                className="bg-secondary/30 border-ink/20 text-ink"
-                maxLength={100}
-              />
-              {!playerName && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <Lock className="w-4 h-4 text-muted-foreground" />
-                </div>
-              )}
-            </div>
-
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
-
-            <Button
-              type="submit"
-              variant="paper"
-              className="w-full"
-              disabled={!guessName.trim() || !playerName || isSubmitting}
-            >
-              {isSubmitting ? (
-                <span className="animate-pulse">Vérification...</span>
-              ) : (
-                <>
-                  <Send className="w-4 h-4 mr-2" />
-                  Soumettre ma réponse
-                </>
-              )}
-            </Button>
-          </form>
-        ) : (
-          <div className={cn(
-            "flex items-center gap-2 p-3 rounded-sm border",
-            result === 'correct'
-              ? "bg-eranove-green/20 border-eranove-green/30"
-              : "bg-primary/20 border-primary/30"
-          )}>
-            {result === 'correct' ? (
-              <>
-                <Check className="w-5 h-5 text-eranove-green" />
-                <span className="text-eranove-green font-typewriter">
-                  +10 POINTS ATTRIBUÉS
-                </span>
-              </>
+            {isSubmitting ? (
+              <span className="animate-pulse">Vérification...</span>
             ) : (
               <>
-                <X className="w-5 h-5 text-primary" />
-                <span className="text-primary font-typewriter">
+                <Send className="w-4 h-4 mr-2" />
+                Soumettre ma réponse
+              </>
+            )}
+          </Button>
+        </form>
+      ) : (
+        <div className="space-y-3">
+          <div className={cn(
+            "flex items-center gap-2 p-3 rounded-lg border",
+            result?.isCorrect
+              ? result?.isFirstFinder
+                ? "bg-accent/20 border-accent/30"
+                : "bg-primary/20 border-primary/30"
+              : "bg-destructive/20 border-destructive/30"
+          )}>
+            {result?.isCorrect ? (
+              result?.isFirstFinder ? (
+                <>
+                  <Trophy className="w-5 h-5 text-accent" />
+                  <span className="text-accent font-semibold">
+                    PREMIER TROUVEUR ! +1 POINT
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-5 h-5 text-primary" />
+                  <span className="text-primary font-medium">
+                    BONNE RÉPONSE (point déjà attribué)
+                  </span>
+                </>
+              )
+            ) : (
+              <>
+                <X className="w-5 h-5 text-destructive" />
+                <span className="text-destructive font-medium">
                   MAUVAISE RÉPONSE
                 </span>
               </>
             )}
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          {onClose && (
+            <Button variant="outline" onClick={onClose} className="w-full">
+              Fermer
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
   );
 };

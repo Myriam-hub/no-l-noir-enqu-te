@@ -19,9 +19,9 @@ const Admin = () => {
   const {
     secrets,
     dailySecrets,
-    todayStats,
+    gameStats,
     leaderboard,
-    todayGuesses,
+    allGuesses,
     currentDay,
     loading,
     loadAdminData,
@@ -157,8 +157,9 @@ const Admin = () => {
   };
 
   // Stats
-  const completedCount = todayStats?.completedPlayers.length || 0;
-  const partialCount = todayStats?.partialPlayers.length || 0;
+  const secretsFound = gameStats?.secretsFound || 0;
+  const totalSecrets = gameStats?.totalSecrets || 0;
+  const totalPlayers = gameStats?.totalPlayers || 0;
 
   // Auth screen
   if (!isAuthenticated) {
@@ -255,83 +256,41 @@ const Admin = () => {
           </div>
         </div>
 
-        {/* Stats Tab */}
+            {/* Stats Tab */}
         {activeTab === 'stats' && (
           <div className="max-w-5xl mx-auto space-y-8">
-            {/* Today's Summary */}
-            <Card className="bg-card/80 backdrop-blur-sm">
+            {/* Summary */}
+            <Card className="bg-card border-border">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-accent" />
-                  Résumé du jour (Jour {currentDay})
+                  <Calendar className="w-5 h-5 text-primary" />
+                  Résumé du Jeu
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="text-center p-4 bg-eranove-green/10 rounded-sm border border-eranove-green/30">
-                    <div className="text-3xl font-typewriter text-eranove-green">{completedCount}</div>
-                    <div className="text-sm text-muted-foreground">Terminé (2/2)</div>
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="text-center p-4 bg-primary/10 rounded-lg border border-primary/20">
+                    <div className="text-3xl font-bold text-primary">{totalPlayers}</div>
+                    <div className="text-sm text-muted-foreground">Joueurs</div>
                   </div>
-                  <div className="text-center p-4 bg-eranove-yellow/10 rounded-sm border border-eranove-yellow/30">
-                    <div className="text-3xl font-typewriter text-eranove-yellow">{partialCount}</div>
-                    <div className="text-sm text-muted-foreground">En cours (1/2)</div>
+                  <div className="text-center p-4 bg-accent/10 rounded-lg border border-accent/20">
+                    <div className="text-3xl font-bold text-accent">{secretsFound}</div>
+                    <div className="text-sm text-muted-foreground">Secrets trouvés</div>
+                  </div>
+                  <div className="text-center p-4 bg-secondary/10 rounded-lg border border-secondary/20">
+                    <div className="text-3xl font-bold text-secondary">{totalSecrets}</div>
+                    <div className="text-sm text-muted-foreground">Secrets total</div>
                   </div>
                 </div>
-
-                {completedCount < 16 && (
-                  <div className="flex items-center gap-2 p-3 bg-primary/20 rounded-sm border border-primary/30">
-                    <AlertCircle className="w-5 h-5 text-primary" />
-                    <span className="text-primary font-typewriter text-sm">
-                      ATTENTION: Moins de 16 joueurs ont terminé aujourd'hui
-                    </span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Player Status Grid */}
-            <Card className="bg-card/80 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-accent" />
-                  Joueurs du jour
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                  {todayStats?.completedPlayers.map((playerName) => (
-                    <div
-                      key={playerName}
-                      className="p-3 rounded-sm border text-center bg-eranove-green/10 border-eranove-green/30"
-                    >
-                      <span className="text-sm font-typewriter truncate block">{playerName}</span>
-                      <div className="text-xs font-typewriter text-eranove-green mt-1">🟢 2/2</div>
-                    </div>
-                  ))}
-                  {todayStats?.partialPlayers.map((playerName) => (
-                    <div
-                      key={playerName}
-                      className="p-3 rounded-sm border text-center bg-eranove-yellow/10 border-eranove-yellow/30"
-                    >
-                      <span className="text-sm font-typewriter truncate block">{playerName}</span>
-                      <div className="text-xs font-typewriter text-eranove-yellow mt-1">🟡 1/2</div>
-                    </div>
-                  ))}
-                </div>
-                {!todayStats?.completedPlayers.length && !todayStats?.partialPlayers.length && (
-                  <p className="text-center text-muted-foreground font-serif">
-                    Aucun joueur n'a encore participé aujourd'hui
-                  </p>
-                )}
               </CardContent>
             </Card>
 
             {/* Leaderboard */}
-            <Card className="bg-card/80 backdrop-blur-sm">
+            <Card className="bg-card border-border">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-gold" />
-                  Classement Général
+                  <Trophy className="w-5 h-5 text-accent" />
+                  Classement (Premiers Trouveurs)
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -341,31 +300,31 @@ const Admin = () => {
                       <div
                         key={player.name}
                         className={cn(
-                          "flex items-center justify-between p-3 rounded-sm border",
-                          index === 0 && "bg-gold/10 border-gold/30",
-                          index === 1 && "bg-gray-300/10 border-gray-300/30",
-                          index === 2 && "bg-amber-600/10 border-amber-600/30",
-                          index > 2 && "bg-secondary/30 border-border"
+                          "flex items-center justify-between p-3 rounded-lg border",
+                          index === 0 && "bg-accent/10 border-accent/30",
+                          index === 1 && "bg-muted border-border",
+                          index === 2 && "bg-secondary/10 border-secondary/30",
+                          index > 2 && "bg-muted/30 border-border"
                         )}
                       >
                         <div className="flex items-center gap-3">
                           <span className={cn(
-                            "w-8 h-8 flex items-center justify-center rounded-full font-typewriter text-sm",
-                            index === 0 && "bg-gold text-background",
-                            index === 1 && "bg-gray-300 text-background",
-                            index === 2 && "bg-amber-600 text-background",
+                            "w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold",
+                            index === 0 && "bg-accent text-accent-foreground",
+                            index === 1 && "bg-muted-foreground/20 text-foreground",
+                            index === 2 && "bg-secondary text-secondary-foreground",
                             index > 2 && "bg-muted text-muted-foreground"
                           )}>
                             {index + 1}
                           </span>
-                          <span className="font-typewriter">{player.name}</span>
+                          <span className="font-medium">{player.name}</span>
                         </div>
-                        <span className="text-xl font-typewriter text-gold">{player.score} pts</span>
+                        <span className="text-xl font-bold text-accent">{player.score} pt{player.score > 1 ? 's' : ''}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-center text-muted-foreground font-serif">Aucun score enregistré</p>
+                  <p className="text-center text-muted-foreground">Aucun score enregistré</p>
                 )}
               </CardContent>
             </Card>

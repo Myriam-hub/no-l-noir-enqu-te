@@ -24,10 +24,11 @@ export interface DailySecrets {
   secret2_id: string | null;
 }
 
-export interface TodayStats {
-  completedPlayers: string[];
-  partialPlayers: string[];
-  totalGuessesToday: number;
+export interface GameStats {
+  totalPlayers: number;
+  secretsFound: number;
+  totalSecrets: number;
+  totalGuesses: number;
 }
 
 export interface LeaderboardEntry {
@@ -38,9 +39,9 @@ export interface LeaderboardEntry {
 export const useAdminGame = (adminCode: string) => {
   const [secrets, setSecrets] = useState<Secret[]>([]);
   const [dailySecrets, setDailySecrets] = useState<DailySecrets[]>([]);
-  const [todayStats, setTodayStats] = useState<TodayStats | null>(null);
+  const [gameStats, setGameStats] = useState<GameStats | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [todayGuesses, setTodayGuesses] = useState<any[]>([]);
+  const [allGuesses, setAllGuesses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const calculateGameDay = useCallback(() => {
@@ -69,14 +70,14 @@ export const useAdminGame = (adminCode: string) => {
   const fetchStats = useCallback(async () => {
     if (!adminCode) return;
     const { data } = await supabase.functions.invoke('admin-stats', {
-      body: { adminCode, day: currentDay },
+      body: { adminCode },
     });
     if (data?.success) {
-      setTodayStats(data.todayStats);
+      setGameStats(data.stats);
       setLeaderboard(data.leaderboard || []);
-      setTodayGuesses(data.todayGuesses || []);
+      setAllGuesses(data.allGuesses || []);
     }
-  }, [adminCode, currentDay]);
+  }, [adminCode]);
 
   const loadAdminData = useCallback(async () => {
     setLoading(true);
@@ -155,7 +156,7 @@ export const useAdminGame = (adminCode: string) => {
   }, [adminCode, fetchSecrets]);
 
   return {
-    secrets, dailySecrets, todayStats, leaderboard, todayGuesses, currentDay, loading,
+    secrets, dailySecrets, gameStats, leaderboard, allGuesses, currentDay, loading,
     loadAdminData, addSecret, updateSecret, deleteSecret, addClue, updateClue, deleteClue,
     setDaySecrets, refreshStats: fetchStats,
   };

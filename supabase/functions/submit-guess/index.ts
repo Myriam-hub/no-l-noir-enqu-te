@@ -22,7 +22,7 @@ serve(async (req) => {
       );
     }
 
-    if (!secretId || !guessName || !day) {
+    if (!secretId || !guessName) {
       return new Response(
         JSON.stringify({ success: false, error: "Données manquantes" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
@@ -51,7 +51,7 @@ serve(async (req) => {
     // Get the secret to check the correct answer
     const { data: secret, error: secretError } = await supabase
       .from("secrets")
-      .select("person_name")
+      .select("person_name, first_found_by")
       .eq("id", secretId)
       .single();
 
@@ -64,6 +64,21 @@ serve(async (req) => {
 
     // Check if the guess is correct (case-insensitive, trimmed)
     const isCorrect = secret.person_name.toLowerCase().trim() === guessName.toLowerCase().trim();
+    
+    // Check if this is the first correct finder
+    let isFirstFinder = false;
+    if (isCorrect && !secret.first_found_by) {
+      isFirstFinder = true;
+      
+      // Update the secret with first finder info
+      await supabase
+        .from("secrets")
+        .update({
+          first_found_by: playerName.trim(),
+          first_found_at: new Date().toISOString()
+        })
+        .eq("id", secretId);
+    }
 
     // Insert the guess
     const { data: guess, error: insertError } = await supabase
@@ -71,9 +86,10 @@ serve(async (req) => {
       .insert({
         player_name: playerName.trim(),
         secret_id: secretId,
-        day: day,
+        day: day || 1,
         guess_name: guessName.trim(),
         is_correct: isCorrect,
+        is_first_finder: isFirstFinder,
       })
       .select()
       .single();
@@ -84,7 +100,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, guessId: guess.id, isCorrect }),
+      JSON.stringify({ success: true, guessId: guess.id, isCorrect, isFirstFinder }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
