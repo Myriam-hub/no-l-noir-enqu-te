@@ -6,12 +6,10 @@ import { PlayerSelector } from '@/components/PlayerSelector';
 import { useGame, Guess } from '@/hooks/useGame';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-
 const Index = () => {
   const [currentPlayerName, setCurrentPlayerName] = useState<string | null>(null);
   const [hasCompletedToday, setHasCompletedToday] = useState(false);
   const [playerGuesses, setPlayerGuesses] = useState<Guess[]>([]);
-
   const {
     todaySecrets,
     currentDay,
@@ -19,7 +17,7 @@ const Index = () => {
     getPlayerGuesses,
     hasPlayerCompletedToday,
     submitGuess,
-    refreshSecrets,
+    refreshSecrets
   } = useGame();
 
   // Load saved player from localStorage
@@ -39,11 +37,9 @@ const Index = () => {
       setPlayerGuesses(guesses);
     }
   }, [currentPlayerName, hasPlayerCompletedToday, getPlayerGuesses]);
-
   useEffect(() => {
     checkPlayerStatus();
   }, [checkPlayerStatus]);
-
   const handleSelectPlayer = async (playerName: string) => {
     setCurrentPlayerName(playerName);
     localStorage.setItem('mystery-player-name', playerName);
@@ -54,64 +50,50 @@ const Index = () => {
     const guesses = await getPlayerGuesses(playerName);
     setPlayerGuesses(guesses);
   };
-
   const handleSubmitGuess = async (secretId: string, guessName: string) => {
-    if (!currentPlayerName) return { success: false, error: 'Non connecté' };
-
+    if (!currentPlayerName) return {
+      success: false,
+      error: 'Non connecté'
+    };
     const result = await submitGuess(currentPlayerName, secretId, guessName);
-
     if (result.success) {
       // Refresh player status
       await checkPlayerStatus();
     }
-
     return result;
   };
-
   const handleChangePlayer = () => {
     setCurrentPlayerName(null);
     setHasCompletedToday(false);
     setPlayerGuesses([]);
     localStorage.removeItem('mystery-player-name');
   };
-
   const getGuessForSecret = (secretId: string) => {
     return playerGuesses.find(g => g.secret_id === secretId);
   };
-
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background vignette flex items-center justify-center">
+    return <div className="min-h-screen bg-background vignette flex items-center justify-center">
         <div className="text-center">
           <Search className="w-12 h-12 text-accent animate-pulse mx-auto mb-4" />
           <p className="font-typewriter text-muted-foreground">Chargement de l'enquête...</p>
         </div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="min-h-screen bg-background vignette">
+  return <div className="min-h-screen bg-background vignette">
       <Header />
 
       {/* Hero Section */}
       <section className="relative pt-24 pb-12 overflow-hidden">
         {/* Floating snowflakes */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {[...Array(12)].map((_, i) => (
-            <Snowflake
-              key={i}
-              className="absolute text-accent/10 animate-pulse"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                width: `${20 + Math.random() * 20}px`,
-                height: `${20 + Math.random() * 20}px`,
-                animationDelay: `${Math.random() * 3}s`,
-                animationDuration: `${3 + Math.random() * 2}s`,
-              }}
-            />
-          ))}
+          {[...Array(12)].map((_, i) => <Snowflake key={i} className="absolute text-accent/10 animate-pulse" style={{
+          left: `${Math.random() * 100}%`,
+          top: `${Math.random() * 100}%`,
+          width: `${20 + Math.random() * 20}px`,
+          height: `${20 + Math.random() * 20}px`,
+          animationDelay: `${Math.random() * 3}s`,
+          animationDuration: `${3 + Math.random() * 2}s`
+        }} />)}
         </div>
 
         <div className="container mx-auto px-4 relative z-10">
@@ -124,7 +106,7 @@ const Index = () => {
             </div>
 
             <h1 className="text-4xl md:text-6xl font-typewriter text-accent mb-4 tracking-wider">
-              Le Mystère du Personnel
+              Les Enquêtes impossibles à Eranove Academy      
             </h1>
             <p className="text-xl text-foreground/80 font-serif italic max-w-2xl mx-auto">
               Enquête de Noël — Chaque jour, découvrez 2 secrets et devinez à qui ils appartiennent.
@@ -140,21 +122,10 @@ const Index = () => {
 
           {/* Player selector */}
           <div className="max-w-md mx-auto space-y-4 mb-12">
-            <PlayerSelector
-              onSelectPlayer={handleSelectPlayer}
-              currentPlayer={currentPlayerName}
-              hasCompletedToday={hasCompletedToday}
-            />
-            {currentPlayerName && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleChangePlayer}
-                className="w-full text-muted-foreground"
-              >
+            <PlayerSelector onSelectPlayer={handleSelectPlayer} currentPlayer={currentPlayerName} hasCompletedToday={hasCompletedToday} />
+            {currentPlayerName && <Button variant="ghost" size="sm" onClick={handleChangePlayer} className="w-full text-muted-foreground">
                 Changer de joueur
-              </Button>
-            )}
+              </Button>}
           </div>
         </div>
       </section>
@@ -163,8 +134,7 @@ const Index = () => {
       <section className="pb-24">
         <div className="container mx-auto px-4">
           {/* Already completed message */}
-          {hasCompletedToday && currentPlayerName && (
-            <Card className="max-w-2xl mx-auto mb-8 bg-eranove-green/10 border-eranove-green/30">
+          {hasCompletedToday && currentPlayerName && <Card className="max-w-2xl mx-auto mb-8 bg-eranove-green/10 border-eranove-green/30">
               <CardContent className="p-6 text-center">
                 <Clock className="w-12 h-12 text-eranove-green mx-auto mb-4" />
                 <h3 className="font-typewriter text-xl text-eranove-green mb-2">
@@ -174,26 +144,13 @@ const Index = () => {
                   Tu as déjà participé aujourd'hui, reviens demain pour de nouveaux secrets !
                 </p>
               </CardContent>
-            </Card>
-          )}
+            </Card>}
 
           <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            {todaySecrets.length > 0 ? (
-              todaySecrets.map((secret, index) => {
-                const guess = getGuessForSecret(secret.id);
-                return (
-                  <SecretCard
-                    key={secret.id}
-                    secret={secret}
-                    secretIndex={index}
-                    onSubmitGuess={handleSubmitGuess}
-                    existingGuess={guess}
-                    playerName={currentPlayerName}
-                  />
-                );
-              })
-            ) : (
-              <div className="col-span-2 text-center py-16">
+            {todaySecrets.length > 0 ? todaySecrets.map((secret, index) => {
+            const guess = getGuessForSecret(secret.id);
+            return <SecretCard key={secret.id} secret={secret} secretIndex={index} onSubmitGuess={handleSubmitGuess} existingGuess={guess} playerName={currentPlayerName} />;
+          }) : <div className="col-span-2 text-center py-16">
                 <div className="inline-block p-8 bg-card/50 rounded-sm border border-border">
                   <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
                   <h3 className="font-typewriter text-xl text-muted-foreground mb-2">
@@ -203,8 +160,7 @@ const Index = () => {
                     Les enquêteurs n'ont pas encore révélé les secrets du jour.
                   </p>
                 </div>
-              </div>
-            )}
+              </div>}
           </div>
 
           {/* Instructions */}
@@ -234,8 +190,6 @@ const Index = () => {
           </div>
         </div>
       </section>
-    </div>
-  );
+    </div>;
 };
-
 export default Index;
