@@ -3,11 +3,11 @@ project_id = "gymcneistfprympxrybr"
 [functions.verify-admin]
 verify_jwt = false
 
-[functions.admin-clues]
+[functions.admin-secrets]
 verify_jwt = false
 
 [functions.admin-stats]
 verify_jwt = false
 
-[functions.submit-answer]
+[functions.submit-guess]
 verify_jwt = false

@@ -1,24 +1,26 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Snowflake, AlertTriangle, Clock } from 'lucide-react';
 import { Header } from '@/components/Header';
-import { GameClueCard } from '@/components/GameClueCard';
+import { SecretCard } from '@/components/SecretCard';
 import { PlayerSelector } from '@/components/PlayerSelector';
-import { useSupabaseGame, Answer } from '@/hooks/useSupabaseGame';
+import { useGame, Guess } from '@/hooks/useGame';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const [currentPlayerName, setCurrentPlayerName] = useState<string | null>(null);
   const [hasCompletedToday, setHasCompletedToday] = useState(false);
-  const [playerAnswers, setPlayerAnswers] = useState<Answer[]>([]);
+  const [playerGuesses, setPlayerGuesses] = useState<Guess[]>([]);
 
   const {
-    todayClues,
+    todaySecrets,
+    currentDay,
     loading,
-    getPlayerTodayAnswers,
+    getPlayerGuesses,
     hasPlayerCompletedToday,
-    submitAnswer,
-  } = useSupabaseGame();
+    submitGuess,
+    refreshSecrets,
+  } = useGame();
 
   // Load saved player from localStorage
   useEffect(() => {
@@ -28,15 +30,15 @@ const Index = () => {
     }
   }, []);
 
-  // Check if player has completed today and get their answers
+  // Check if player has completed today and get their guesses
   const checkPlayerStatus = useCallback(async () => {
     if (currentPlayerName) {
       const completed = await hasPlayerCompletedToday(currentPlayerName);
       setHasCompletedToday(completed);
-      const answers = await getPlayerTodayAnswers(currentPlayerName);
-      setPlayerAnswers(answers);
+      const guesses = await getPlayerGuesses(currentPlayerName);
+      setPlayerGuesses(guesses);
     }
-  }, [currentPlayerName, hasPlayerCompletedToday, getPlayerTodayAnswers]);
+  }, [currentPlayerName, hasPlayerCompletedToday, getPlayerGuesses]);
 
   useEffect(() => {
     checkPlayerStatus();
@@ -49,14 +51,14 @@ const Index = () => {
     // Check completion status immediately
     const completed = await hasPlayerCompletedToday(playerName);
     setHasCompletedToday(completed);
-    const answers = await getPlayerTodayAnswers(playerName);
-    setPlayerAnswers(answers);
+    const guesses = await getPlayerGuesses(playerName);
+    setPlayerGuesses(guesses);
   };
 
-  const handleSubmitGuess = async (clueId: string, guess: string) => {
-    if (!currentPlayerName) return { success: false, isCorrect: false };
+  const handleSubmitGuess = async (secretId: string, guessName: string) => {
+    if (!currentPlayerName) return { success: false, error: 'Non connecté' };
 
-    const result = await submitAnswer(currentPlayerName, clueId, guess);
+    const result = await submitGuess(currentPlayerName, secretId, guessName);
 
     if (result.success) {
       // Refresh player status
@@ -69,12 +71,12 @@ const Index = () => {
   const handleChangePlayer = () => {
     setCurrentPlayerName(null);
     setHasCompletedToday(false);
-    setPlayerAnswers([]);
+    setPlayerGuesses([]);
     localStorage.removeItem('mystery-player-name');
   };
 
-  const getAnswerForClue = (clueId: string) => {
-    return playerAnswers.find(a => a.clue_id === clueId);
+  const getGuessForSecret = (secretId: string) => {
+    return playerGuesses.find(g => g.secret_id === secretId);
   };
 
   if (loading) {
@@ -117,7 +119,7 @@ const Index = () => {
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/20 rounded-sm border border-primary/30 mb-6">
               <AlertTriangle className="w-4 h-4 text-primary" />
               <span className="font-typewriter text-sm text-primary uppercase tracking-wider">
-                Dossier Classé Confidentiel
+                Dossier Classé Confidentiel — Jour {currentDay}/10
               </span>
             </div>
 
@@ -125,8 +127,7 @@ const Index = () => {
               Le Mystère du Personnel
             </h1>
             <p className="text-xl text-foreground/80 font-serif italic max-w-2xl mx-auto">
-              Enquête de Noël — Chaque jour, deux nouveaux indices vous mèneront
-              vers l'identité mystérieuse d'un membre de l'équipe.
+              Enquête de Noël — Chaque jour, découvrez 2 secrets et devinez à qui ils appartiennent.
             </p>
 
             {/* Decorative line */}
@@ -158,7 +159,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Clues Section */}
+      {/* Secrets Section */}
       <section className="pb-24">
         <div className="container mx-auto px-4">
           {/* Already completed message */}
@@ -170,24 +171,23 @@ const Index = () => {
                   PARTICIPATION TERMINÉE
                 </h3>
                 <p className="text-foreground/80 font-serif">
-                  Tu as déjà participé aujourd'hui, reviens demain pour de nouveaux indices !
+                  Tu as déjà participé aujourd'hui, reviens demain pour de nouveaux secrets !
                 </p>
               </CardContent>
             </Card>
           )}
 
           <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            {todayClues.length > 0 ? (
-              todayClues.map((clue, index) => {
-                const answer = getAnswerForClue(clue.id);
+            {todaySecrets.length > 0 ? (
+              todaySecrets.map((secret, index) => {
+                const guess = getGuessForSecret(secret.id);
                 return (
-                  <GameClueCard
-                    key={clue.id}
-                    clue={clue}
-                    clueIndex={index}
+                  <SecretCard
+                    key={secret.id}
+                    secret={secret}
+                    secretIndex={index}
                     onSubmitGuess={handleSubmitGuess}
-                    hasAnswered={!!answer}
-                    wasCorrect={answer?.is_correct}
+                    existingGuess={guess}
                     playerName={currentPlayerName}
                   />
                 );
@@ -197,10 +197,10 @@ const Index = () => {
                 <div className="inline-block p-8 bg-card/50 rounded-sm border border-border">
                   <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
                   <h3 className="font-typewriter text-xl text-muted-foreground mb-2">
-                    AUCUN INDICE DISPONIBLE
+                    AUCUN SECRET DISPONIBLE
                   </h3>
                   <p className="text-muted-foreground/70 font-serif">
-                    Les enquêteurs n'ont pas encore révélé les indices du jour.
+                    Les enquêteurs n'ont pas encore révélé les secrets du jour.
                   </p>
                 </div>
               </div>
@@ -216,19 +216,19 @@ const Index = () => {
             <ul className="space-y-2 text-foreground/80 font-serif">
               <li className="flex items-start gap-2">
                 <span className="text-gold">•</span>
-                Chaque jour, 2 nouveaux indices sont révélés (10 jours de jeu)
+                Le jeu dure 10 jours avec 2 secrets révélés chaque jour
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-gold">•</span>
-                Identifiez le membre de l'équipe correspondant à chaque indice
+                Cliquez sur un secret pour voir ses indices
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-gold">•</span>
-                Chaque bonne réponse rapporte 1 point
+                Devinez à qui appartient chaque secret
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-gold">•</span>
-                Une seule participation par jour (2 réponses maximum)
+                Chaque bonne réponse rapporte 10 points
               </li>
             </ul>
           </div>

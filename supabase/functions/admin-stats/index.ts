@@ -2,109 +2,97 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { adminCode, day } = await req.json();
-    
+
     // Verify admin code
-    const storedCode = Deno.env.get('ADMIN_CODE');
-    if (!storedCode || adminCode !== storedCode) {
-      console.log('Admin verification failed');
+    const expectedCode = Deno.env.get("ADMIN_CODE");
+    if (!expectedCode || adminCode !== expectedCode) {
       return new Response(
-        JSON.stringify({ error: 'Code administrateur invalide' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: "Code admin invalide" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
       );
     }
 
-    // Create Supabase client with service role
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get all answers
-    const { data: allAnswers, error: answersError } = await supabase
-      .from('answers')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // Get all guesses
+    const { data: allGuesses, error: guessesError } = await supabase
+      .from("guesses")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-    if (answersError) {
-      console.error('Fetch answers error:', answersError);
-      throw answersError;
-    }
+    if (guessesError) throw guessesError;
 
-    // Get today's answers
-    const todayAnswers = allAnswers?.filter(a => a.day === day) || [];
+    // Get daily config
+    const { data: dailyConfig, error: dailyError } = await supabase
+      .from("daily_secrets")
+      .select("*")
+      .eq("day", day)
+      .maybeSingle();
 
-    // Calculate unique players who answered today
-    const playersToday = [...new Set(todayAnswers.map(a => a.player_name))];
-    
-    // Calculate players with 2 answers today (completed)
-    const playerAnswerCounts: Record<string, number> = {};
-    todayAnswers.forEach(a => {
-      playerAnswerCounts[a.player_name] = (playerAnswerCounts[a.player_name] || 0) + 1;
+    if (dailyError) throw dailyError;
+
+    // Filter guesses for today
+    const todayGuesses = allGuesses?.filter(g => g.day === day) || [];
+
+    // Count guesses per player for today
+    const playerGuessCount: Record<string, number> = {};
+    todayGuesses.forEach(g => {
+      playerGuessCount[g.player_name] = (playerGuessCount[g.player_name] || 0) + 1;
     });
-    
-    const completedPlayers = Object.entries(playerAnswerCounts)
+
+    // Players who completed both secrets today
+    const completedPlayers = Object.entries(playerGuessCount)
       .filter(([_, count]) => count >= 2)
       .map(([name]) => name);
 
-    const partialPlayers = Object.entries(playerAnswerCounts)
+    // Players who only did 1 secret
+    const partialPlayers = Object.entries(playerGuessCount)
       .filter(([_, count]) => count === 1)
       .map(([name]) => name);
 
-    // Calculate leaderboard (total correct answers per player)
+    // Calculate leaderboard (10 points per correct guess)
     const playerScores: Record<string, number> = {};
-    allAnswers?.forEach(a => {
-      if (a.is_correct) {
-        playerScores[a.player_name] = (playerScores[a.player_name] || 0) + 1;
-      }
+    allGuesses?.forEach(g => {
+      if (!playerScores[g.player_name]) playerScores[g.player_name] = 0;
+      if (g.is_correct) playerScores[g.player_name] += 10;
     });
 
     const leaderboard = Object.entries(playerScores)
       .map(([name, score]) => ({ name, score }))
       .sort((a, b) => b.score - a.score);
 
-    // Get all unique player names who have ever played
-    const allPlayers = [...new Set(allAnswers?.map(a => a.player_name) || [])];
-
-    console.log(`Stats: ${completedPlayers.length} completed, ${partialPlayers.length} partial, ${leaderboard.length} total players`);
-
     return new Response(
       JSON.stringify({
         success: true,
-        data: {
-          todayStats: {
-            completedPlayers,
-            partialPlayers,
-            totalAnswersToday: todayAnswers.length,
-          },
-          leaderboard,
-          allPlayers,
-          todayAnswers: todayAnswers.map(a => ({
-            player_name: a.player_name,
-            is_correct: a.is_correct,
-            clue_id: a.clue_id,
-            created_at: a.created_at,
-          })),
-        }
+        todayStats: {
+          completedPlayers,
+          partialPlayers,
+          totalGuessesToday: todayGuesses.length,
+        },
+        leaderboard,
+        todayGuesses,
+        dailyConfig,
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-
   } catch (error) {
-    console.error('Admin stats error:', error);
-    const message = error instanceof Error ? error.message : 'Une erreur est survenue';
+    console.error("Error in admin-stats:", error);
     return new Response(
-      JSON.stringify({ error: message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Erreur serveur" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
 });

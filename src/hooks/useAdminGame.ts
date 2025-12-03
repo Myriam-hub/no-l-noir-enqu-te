@@ -1,19 +1,33 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface Secret {
+  id: string;
+  title: string;
+  person_name: string;
+  is_active: boolean;
+  created_at: string;
+  clues: Clue[];
+}
+
 export interface Clue {
   id: string;
-  day: string;
-  clue_number: number;
+  secret_id: string;
   text: string;
-  answer: string;
   created_at: string;
+}
+
+export interface DailySecrets {
+  id: string;
+  day: number;
+  secret1_id: string | null;
+  secret2_id: string | null;
 }
 
 export interface TodayStats {
   completedPlayers: string[];
   partialPlayers: string[];
-  totalAnswersToday: number;
+  totalGuessesToday: number;
 }
 
 export interface LeaderboardEntry {
@@ -21,161 +35,128 @@ export interface LeaderboardEntry {
   score: number;
 }
 
-export interface TodayAnswer {
-  player_name: string;
-  is_correct: boolean;
-  clue_id: string;
-  created_at: string;
-}
-
 export const useAdminGame = (adminCode: string) => {
-  const [allClues, setAllClues] = useState<Clue[]>([]);
+  const [secrets, setSecrets] = useState<Secret[]>([]);
+  const [dailySecrets, setDailySecrets] = useState<DailySecrets[]>([]);
   const [todayStats, setTodayStats] = useState<TodayStats | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [allPlayers, setAllPlayers] = useState<string[]>([]);
-  const [todayAnswers, setTodayAnswers] = useState<TodayAnswer[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [todayGuesses, setTodayGuesses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const today = new Date().toISOString().split('T')[0];
+  const calculateGameDay = useCallback(() => {
+    const startDate = new Date('2024-12-01');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    startDate.setHours(0, 0, 0, 0);
+    const diffTime = today.getTime() - startDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    return Math.max(1, Math.min(10, diffDays));
+  }, []);
 
-  // Fetch all clues (admin only)
-  const fetchAllClues = useCallback(async () => {
+  const currentDay = calculateGameDay();
+
+  const fetchSecrets = useCallback(async () => {
     if (!adminCode) return;
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('admin-clues', {
-        body: { action: 'list', adminCode },
-      });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
-      setAllClues(data.data || []);
-    } catch (err) {
-      console.error('Error fetching clues:', err);
-      setError(err instanceof Error ? err.message : 'Erreur');
+    const { data } = await supabase.functions.invoke('admin-secrets', {
+      body: { action: 'list', adminCode },
+    });
+    if (data?.success) {
+      setSecrets(data.secrets || []);
+      setDailySecrets(data.dailySecrets || []);
     }
   }, [adminCode]);
 
-  // Fetch stats (admin only)
   const fetchStats = useCallback(async () => {
     if (!adminCode) return;
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('admin-stats', {
-        body: { adminCode, day: today },
-      });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
-      setTodayStats(data.data.todayStats);
-      setLeaderboard(data.data.leaderboard);
-      setAllPlayers(data.data.allPlayers);
-      setTodayAnswers(data.data.todayAnswers);
-    } catch (err) {
-      console.error('Error fetching stats:', err);
-      setError(err instanceof Error ? err.message : 'Erreur');
+    const { data } = await supabase.functions.invoke('admin-stats', {
+      body: { adminCode, day: currentDay },
+    });
+    if (data?.success) {
+      setTodayStats(data.todayStats);
+      setLeaderboard(data.leaderboard || []);
+      setTodayGuesses(data.todayGuesses || []);
     }
-  }, [adminCode, today]);
+  }, [adminCode, currentDay]);
 
-  // Add clue
-  const addClue = useCallback(async (
-    day: string,
-    clueNumber: number,
-    text: string,
-    answer: string
-  ): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const { data, error } = await supabase.functions.invoke('admin-clues', {
-        body: {
-          action: 'add',
-          adminCode,
-          clueData: { day, clue_number: clueNumber, text, answer },
-        },
-      });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
-      await fetchAllClues();
-      return { success: true };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erreur';
-      return { success: false, error: message };
-    }
-  }, [adminCode, fetchAllClues]);
-
-  // Update clue
-  const updateClue = useCallback(async (
-    id: string,
-    updates: Partial<Omit<Clue, 'id' | 'created_at'>>
-  ): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const { data, error } = await supabase.functions.invoke('admin-clues', {
-        body: {
-          action: 'update',
-          adminCode,
-          clueId: id,
-          clueData: updates,
-        },
-      });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
-      await fetchAllClues();
-      return { success: true };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erreur';
-      return { success: false, error: message };
-    }
-  }, [adminCode, fetchAllClues]);
-
-  // Delete clue
-  const deleteClue = useCallback(async (id: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const { data, error } = await supabase.functions.invoke('admin-clues', {
-        body: {
-          action: 'delete',
-          adminCode,
-          clueId: id,
-        },
-      });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
-      await fetchAllClues();
-      return { success: true };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erreur';
-      return { success: false, error: message };
-    }
-  }, [adminCode, fetchAllClues]);
-
-  // Load all admin data
   const loadAdminData = useCallback(async () => {
     setLoading(true);
-    await Promise.all([fetchAllClues(), fetchStats()]);
+    await Promise.all([fetchSecrets(), fetchStats()]);
     setLoading(false);
-  }, [fetchAllClues, fetchStats]);
+  }, [fetchSecrets, fetchStats]);
+
+  const addSecret = useCallback(async (title: string, personName: string) => {
+    const { data, error } = await supabase.functions.invoke('admin-secrets', {
+      body: { action: 'add', adminCode, secret: { title, person_name: personName } },
+    });
+    if (error) return { success: false, error: error.message };
+    if (!data?.success) return { success: false, error: data?.error };
+    await fetchSecrets();
+    return { success: true };
+  }, [adminCode, fetchSecrets]);
+
+  const updateSecret = useCallback(async (secretId: string, updates: Partial<Secret>) => {
+    const { data, error } = await supabase.functions.invoke('admin-secrets', {
+      body: { action: 'update', adminCode, secretId, secret: updates },
+    });
+    if (error) return { success: false, error: error.message };
+    if (!data?.success) return { success: false, error: data?.error };
+    await fetchSecrets();
+    return { success: true };
+  }, [adminCode, fetchSecrets]);
+
+  const deleteSecret = useCallback(async (secretId: string) => {
+    const { data, error } = await supabase.functions.invoke('admin-secrets', {
+      body: { action: 'delete', adminCode, secretId },
+    });
+    if (error) return { success: false, error: error.message };
+    if (!data?.success) return { success: false, error: data?.error };
+    await fetchSecrets();
+    return { success: true };
+  }, [adminCode, fetchSecrets]);
+
+  const addClue = useCallback(async (secretId: string, text: string) => {
+    const { data, error } = await supabase.functions.invoke('admin-secrets', {
+      body: { action: 'addClue', adminCode, secretId, clueText: text },
+    });
+    if (error) return { success: false, error: error.message };
+    if (!data?.success) return { success: false, error: data?.error };
+    await fetchSecrets();
+    return { success: true };
+  }, [adminCode, fetchSecrets]);
+
+  const updateClue = useCallback(async (clueId: string, text: string) => {
+    const { data, error } = await supabase.functions.invoke('admin-secrets', {
+      body: { action: 'updateClue', adminCode, clueId, clueText: text },
+    });
+    if (error) return { success: false, error: error.message };
+    if (!data?.success) return { success: false, error: data?.error };
+    await fetchSecrets();
+    return { success: true };
+  }, [adminCode, fetchSecrets]);
+
+  const deleteClue = useCallback(async (clueId: string) => {
+    const { data, error } = await supabase.functions.invoke('admin-secrets', {
+      body: { action: 'deleteClue', adminCode, clueId },
+    });
+    if (error) return { success: false, error: error.message };
+    if (!data?.success) return { success: false, error: data?.error };
+    await fetchSecrets();
+    return { success: true };
+  }, [adminCode, fetchSecrets]);
+
+  const setDaySecrets = useCallback(async (day: number, secret1Id: string | null, secret2Id: string | null) => {
+    const { data, error } = await supabase.functions.invoke('admin-secrets', {
+      body: { action: 'setDailySecrets', adminCode, day, secretIds: [secret1Id, secret2Id] },
+    });
+    if (error) return { success: false, error: error.message };
+    if (!data?.success) return { success: false, error: data?.error };
+    await fetchSecrets();
+    return { success: true };
+  }, [adminCode, fetchSecrets]);
 
   return {
-    allClues,
-    todayStats,
-    leaderboard,
-    allPlayers,
-    todayAnswers,
-    loading,
-    error,
-    today,
-    loadAdminData,
-    fetchAllClues,
-    fetchStats,
-    addClue,
-    updateClue,
-    deleteClue,
+    secrets, dailySecrets, todayStats, leaderboard, todayGuesses, currentDay, loading,
+    loadAdminData, addSecret, updateSecret, deleteSecret, addClue, updateClue, deleteClue,
+    setDaySecrets, refreshStats: fetchStats,
   };
 };

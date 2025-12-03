@@ -1,50 +1,44 @@
 import { useState } from 'react';
-import { FileText, Send, Check, X, Lock } from 'lucide-react';
+import { FileText, Send, Check, X, Lock, ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import type { Secret, Guess } from '@/hooks/useGame';
 
-interface Clue {
-  id: string;
-  day: string;
-  clue_number: number;
-  text: string;
-  answer: string;
-}
-
-interface GameClueCardProps {
-  clue: Clue;
-  clueIndex: number;
-  onSubmitGuess: (clueId: string, guess: string) => Promise<{ success: boolean; isCorrect: boolean; error?: string }>;
-  hasAnswered: boolean;
-  wasCorrect?: boolean;
+interface SecretCardProps {
+  secret: Secret;
+  secretIndex: number;
+  onSubmitGuess: (secretId: string, guessName: string) => Promise<{ success: boolean; isCorrect?: boolean; error?: string }>;
+  existingGuess?: Guess;
   playerName: string | null;
 }
 
-export const GameClueCard = ({
-  clue,
-  clueIndex,
+export const SecretCard = ({
+  secret,
+  secretIndex,
   onSubmitGuess,
-  hasAnswered,
-  wasCorrect,
+  existingGuess,
   playerName,
-}: GameClueCardProps) => {
-  const [answer, setAnswer] = useState('');
+}: SecretCardProps) => {
+  const [guessName, setGuessName] = useState('');
+  const [showClues, setShowClues] = useState(false);
   const [result, setResult] = useState<'correct' | 'incorrect' | null>(
-    hasAnswered ? (wasCorrect ? 'correct' : 'incorrect') : null
+    existingGuess ? (existingGuess.is_correct ? 'correct' : 'incorrect') : null
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const hasAnswered = !!existingGuess;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!answer.trim() || !playerName || hasAnswered) return;
+    if (!guessName.trim() || !playerName || hasAnswered) return;
 
     setIsSubmitting(true);
     setError('');
 
-    const response = await onSubmitGuess(clue.id, answer.trim());
+    const response = await onSubmitGuess(secret.id, guessName.trim());
     
     if (response.success) {
       setResult(response.isCorrect ? 'correct' : 'incorrect');
@@ -62,7 +56,7 @@ export const GameClueCard = ({
         result === 'correct' && "ring-2 ring-eranove-green/50",
         result === 'incorrect' && "ring-2 ring-primary/50"
       )}
-      style={{ animationDelay: `${clueIndex * 200}ms` }}
+      style={{ animationDelay: `${secretIndex * 200}ms` }}
     >
       {/* Paperclip decoration */}
       <div className="absolute -top-2 left-8 w-6 h-12 bg-gradient-to-b from-gray-400 to-gray-500 rounded-full transform -rotate-12 shadow-md" />
@@ -77,7 +71,7 @@ export const GameClueCard = ({
               <FileText className="w-5 h-5 text-accent" />
             </div>
             <CardTitle className="text-ink text-xl">
-              INDICE #{clue.clue_number}
+              SECRET #{secretIndex + 1}
             </CardTitle>
           </div>
 
@@ -99,11 +93,38 @@ export const GameClueCard = ({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Clue content */}
+        {/* Secret title */}
         <div className="bg-paper/30 p-4 rounded-sm border border-ink/10">
-          <p className="text-ink text-lg leading-relaxed font-serif italic">
-            "{clue.text}"
-          </p>
+          <h3 className="text-ink text-lg leading-relaxed font-serif italic mb-2">
+            "{secret.title}"
+          </h3>
+          
+          {/* Toggle clues button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowClues(!showClues)}
+            className="w-full justify-between text-muted-foreground hover:text-accent"
+          >
+            <span>{showClues ? 'Masquer les indices' : `Voir les indices (${secret.clues.length})`}</span>
+            {showClues ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </Button>
+          
+          {/* Clues list */}
+          {showClues && secret.clues.length > 0 && (
+            <div className="mt-3 space-y-2 border-t border-ink/10 pt-3">
+              {secret.clues.map((clue, i) => (
+                <div key={clue.id} className="flex gap-2 text-sm">
+                  <span className="text-accent font-typewriter">#{i + 1}</span>
+                  <span className="text-ink/80 font-serif">{clue.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {showClues && secret.clues.length === 0 && (
+            <p className="mt-3 text-sm text-muted-foreground italic">Aucun indice supplémentaire.</p>
+          )}
         </div>
 
         {/* Guess form */}
@@ -111,9 +132,9 @@ export const GameClueCard = ({
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="relative">
               <Input
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                placeholder="Entrez le nom du collègue..."
+                value={guessName}
+                onChange={(e) => setGuessName(e.target.value)}
+                placeholder="À qui appartient ce secret ?"
                 disabled={!playerName || isSubmitting}
                 className="bg-secondary/30 border-ink/20 text-ink"
                 maxLength={100}
@@ -133,7 +154,7 @@ export const GameClueCard = ({
               type="submit"
               variant="paper"
               className="w-full"
-              disabled={!answer.trim() || !playerName || isSubmitting}
+              disabled={!guessName.trim() || !playerName || isSubmitting}
             >
               {isSubmitting ? (
                 <span className="animate-pulse">Vérification...</span>
@@ -156,7 +177,7 @@ export const GameClueCard = ({
               <>
                 <Check className="w-5 h-5 text-eranove-green" />
                 <span className="text-eranove-green font-typewriter">
-                  +1 POINT ATTRIBUÉ
+                  +10 POINTS ATTRIBUÉS
                 </span>
               </>
             ) : (
