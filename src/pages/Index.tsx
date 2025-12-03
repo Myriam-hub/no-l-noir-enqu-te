@@ -8,13 +8,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
-  const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null);
   const [currentPlayerName, setCurrentPlayerName] = useState<string | null>(null);
   const [hasCompletedToday, setHasCompletedToday] = useState(false);
   const [playerAnswers, setPlayerAnswers] = useState<Answer[]>([]);
 
   const {
-    players,
     todayClues,
     loading,
     getPlayerTodayAnswers,
@@ -24,48 +22,41 @@ const Index = () => {
 
   // Load saved player from localStorage
   useEffect(() => {
-    const savedPlayerId = localStorage.getItem('mystery-player-id');
     const savedPlayerName = localStorage.getItem('mystery-player-name');
-    if (savedPlayerId && savedPlayerName) {
-      setCurrentPlayerId(savedPlayerId);
+    if (savedPlayerName) {
       setCurrentPlayerName(savedPlayerName);
     }
   }, []);
 
   // Check if player has completed today and get their answers
   const checkPlayerStatus = useCallback(async () => {
-    if (currentPlayerId) {
-      const completed = await hasPlayerCompletedToday(currentPlayerId);
+    if (currentPlayerName) {
+      const completed = await hasPlayerCompletedToday(currentPlayerName);
       setHasCompletedToday(completed);
-      const answers = await getPlayerTodayAnswers(currentPlayerId);
+      const answers = await getPlayerTodayAnswers(currentPlayerName);
       setPlayerAnswers(answers);
     }
-  }, [currentPlayerId, hasPlayerCompletedToday, getPlayerTodayAnswers]);
+  }, [currentPlayerName, hasPlayerCompletedToday, getPlayerTodayAnswers]);
 
   useEffect(() => {
     checkPlayerStatus();
   }, [checkPlayerStatus]);
 
-  const handleSelectPlayer = async (playerId: string, playerName: string) => {
-    setCurrentPlayerId(playerId);
+  const handleSelectPlayer = async (playerName: string) => {
     setCurrentPlayerName(playerName);
-    localStorage.setItem('mystery-player-id', playerId);
     localStorage.setItem('mystery-player-name', playerName);
 
     // Check completion status immediately
-    const completed = await hasPlayerCompletedToday(playerId);
+    const completed = await hasPlayerCompletedToday(playerName);
     setHasCompletedToday(completed);
-    const answers = await getPlayerTodayAnswers(playerId);
+    const answers = await getPlayerTodayAnswers(playerName);
     setPlayerAnswers(answers);
   };
 
   const handleSubmitGuess = async (clueId: string, guess: string) => {
-    if (!currentPlayerId) return { success: false, isCorrect: false };
+    if (!currentPlayerName) return { success: false, isCorrect: false };
 
-    const clue = todayClues.find(c => c.id === clueId);
-    if (!clue) return { success: false, isCorrect: false };
-
-    const result = await submitAnswer(currentPlayerId, clueId, guess, clue);
+    const result = await submitAnswer(currentPlayerName, clueId, guess);
 
     if (result.success) {
       // Refresh player status
@@ -76,11 +67,9 @@ const Index = () => {
   };
 
   const handleChangePlayer = () => {
-    setCurrentPlayerId(null);
     setCurrentPlayerName(null);
     setHasCompletedToday(false);
     setPlayerAnswers([]);
-    localStorage.removeItem('mystery-player-id');
     localStorage.removeItem('mystery-player-name');
   };
 
@@ -151,7 +140,6 @@ const Index = () => {
           {/* Player selector */}
           <div className="max-w-md mx-auto space-y-4 mb-12">
             <PlayerSelector
-              players={players}
               onSelectPlayer={handleSelectPlayer}
               currentPlayer={currentPlayerName}
               hasCompletedToday={hasCompletedToday}
@@ -174,7 +162,7 @@ const Index = () => {
       <section className="pb-24">
         <div className="container mx-auto px-4">
           {/* Already completed message */}
-          {hasCompletedToday && currentPlayerId && (
+          {hasCompletedToday && currentPlayerName && (
             <Card className="max-w-2xl mx-auto mb-8 bg-eranove-green/10 border-eranove-green/30">
               <CardContent className="p-6 text-center">
                 <Clock className="w-12 h-12 text-eranove-green mx-auto mb-4" />
@@ -197,7 +185,6 @@ const Index = () => {
                     key={clue.id}
                     clue={clue}
                     clueIndex={index}
-                    players={players}
                     onSubmitGuess={handleSubmitGuess}
                     hasAnswered={!!answer}
                     wasCorrect={answer?.is_correct}
@@ -229,7 +216,7 @@ const Index = () => {
             <ul className="space-y-2 text-foreground/80 font-serif">
               <li className="flex items-start gap-2">
                 <span className="text-gold">•</span>
-                Chaque jour, 2 nouveaux indices sont révélés
+                Chaque jour, 2 nouveaux indices sont révélés (10 jours de jeu)
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-gold">•</span>

@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, Save, X, FileText, Eye, Lock, Users, Trophy, Calendar, AlertCircle, Check } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useSupabaseGame, PlayerScore, Clue } from '@/hooks/useSupabaseGame';
+import { useAdminGame, Clue } from '@/hooks/useAdminGame';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -12,28 +12,27 @@ import { useToast } from '@/hooks/use-toast';
 const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminCode, setAdminCode] = useState('');
+  const [storedAdminCode, setStoredAdminCode] = useState('');
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
   const {
-    players,
     allClues,
+    todayStats,
+    leaderboard,
+    todayAnswers,
     today,
     loading,
+    loadAdminData,
     addClue,
     updateClue,
     deleteClue,
-    getLeaderboard,
-    updatePlayerName,
-  } = useSupabaseGame();
+  } = useAdminGame(storedAdminCode);
 
   const { toast } = useToast();
 
-  const [leaderboard, setLeaderboard] = useState<PlayerScore[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
-  const [editPlayerName, setEditPlayerName] = useState('');
 
   const [newClue, setNewClue] = useState({
     day: today,
@@ -44,25 +43,12 @@ const Admin = () => {
 
   const [editForm, setEditForm] = useState<Partial<Clue>>({});
 
-  // Check if admin is authenticated from sessionStorage
+  // Load admin data when authenticated
   useEffect(() => {
-    const savedAuth = sessionStorage.getItem('admin-authenticated');
-    if (savedAuth === 'true') {
-      setIsAuthenticated(true);
+    if (isAuthenticated && storedAdminCode) {
+      loadAdminData();
     }
-  }, []);
-
-  // Fetch leaderboard when authenticated
-  const fetchLeaderboard = useCallback(async () => {
-    if (isAuthenticated) {
-      const data = await getLeaderboard();
-      setLeaderboard(data);
-    }
-  }, [isAuthenticated, getLeaderboard]);
-
-  useEffect(() => {
-    fetchLeaderboard();
-  }, [fetchLeaderboard]);
+  }, [isAuthenticated, storedAdminCode, loadAdminData]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +64,8 @@ const Admin = () => {
 
       if (data.valid) {
         setIsAuthenticated(true);
-        sessionStorage.setItem('admin-authenticated', 'true');
+        setStoredAdminCode(adminCode);
+        // Don't store in sessionStorage - require code on every session
       } else {
         setAuthError('Code admin incorrect');
       }
@@ -135,23 +122,8 @@ const Admin = () => {
     const result = await deleteClue(id);
     if (result.success) {
       toast({ title: 'Indice supprimé' });
-    }
-  };
-
-  const handleStartEditPlayer = (player: { id: string; name: string }) => {
-    setEditingPlayerId(player.id);
-    setEditPlayerName(player.name);
-  };
-
-  const handleSavePlayerName = async () => {
-    if (editingPlayerId && editPlayerName.trim()) {
-      const result = await updatePlayerName(editingPlayerId, editPlayerName.trim());
-      if (result.success) {
-        toast({ title: 'Nom modifié' });
-        await fetchLeaderboard();
-      }
-      setEditingPlayerId(null);
-      setEditPlayerName('');
+    } else {
+      toast({ title: 'Erreur', description: result.error, variant: 'destructive' });
     }
   };
 
@@ -164,9 +136,14 @@ const Admin = () => {
   }, {} as Record<string, Clue[]>);
 
   // Stats for today
-  const playersCompletedToday = leaderboard.filter(p => p.answers_today >= 2).length;
-  const playersPartialToday = leaderboard.filter(p => p.answers_today === 1).length;
-  const playersNotStarted = leaderboard.filter(p => p.answers_today === 0).length;
+  const completedCount = todayStats?.completedPlayers.length || 0;
+  const partialCount = todayStats?.partialPlayers.length || 0;
+
+  // Get player status for today
+  const getPlayerStatus = (playerName: string) => {
+    const playerAnswers = todayAnswers.filter(a => a.player_name === playerName);
+    return playerAnswers.length;
+  };
 
   // Auth screen
   if (!isAuthenticated) {
@@ -246,22 +223,18 @@ const Admin = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-2 gap-4 mb-4">
                 <div className="text-center p-4 bg-eranove-green/10 rounded-sm border border-eranove-green/30">
-                  <div className="text-3xl font-typewriter text-eranove-green">{playersCompletedToday}</div>
+                  <div className="text-3xl font-typewriter text-eranove-green">{completedCount}</div>
                   <div className="text-sm text-muted-foreground">Terminé (2/2)</div>
                 </div>
                 <div className="text-center p-4 bg-eranove-yellow/10 rounded-sm border border-eranove-yellow/30">
-                  <div className="text-3xl font-typewriter text-eranove-yellow">{playersPartialToday}</div>
+                  <div className="text-3xl font-typewriter text-eranove-yellow">{partialCount}</div>
                   <div className="text-sm text-muted-foreground">En cours (1/2)</div>
-                </div>
-                <div className="text-center p-4 bg-primary/10 rounded-sm border border-primary/30">
-                  <div className="text-3xl font-typewriter text-primary">{playersNotStarted}</div>
-                  <div className="text-sm text-muted-foreground">Non commencé</div>
                 </div>
               </div>
 
-              {playersCompletedToday < 16 && (
+              {completedCount < 16 && (
                 <div className="flex items-center gap-2 p-3 bg-primary/20 rounded-sm border border-primary/30">
                   <AlertCircle className="w-5 h-5 text-primary" />
                   <span className="text-primary font-typewriter text-sm">
@@ -279,61 +252,41 @@ const Admin = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-accent" />
-                Suivi des joueurs
+                Joueurs du jour ({todayStats?.completedPlayers.length || 0} + {todayStats?.partialPlayers.length || 0} joueurs)
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                {leaderboard.map((player) => (
+                {/* Completed players */}
+                {todayStats?.completedPlayers.map((playerName) => (
                   <div
-                    key={player.player_id}
-                    className={cn(
-                      "p-3 rounded-sm border text-center transition-all",
-                      player.answers_today >= 2 && "bg-eranove-green/10 border-eranove-green/30",
-                      player.answers_today === 1 && "bg-eranove-yellow/10 border-eranove-yellow/30",
-                      player.answers_today === 0 && "bg-primary/10 border-primary/30"
-                    )}
+                    key={playerName}
+                    className="p-3 rounded-sm border text-center bg-eranove-green/10 border-eranove-green/30"
                   >
-                    {editingPlayerId === player.player_id ? (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          value={editPlayerName}
-                          onChange={(e) => setEditPlayerName(e.target.value)}
-                          className="h-7 text-xs"
-                        />
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSavePlayerName}>
-                          <Check className="w-3 h-3" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingPlayerId(null)}>
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-center gap-1 mb-1">
-                          <span className="text-sm font-typewriter truncate">{player.name}</span>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-5 w-5"
-                            onClick={() => handleStartEditPlayer({ id: player.player_id, name: player.name })}
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                        <div className={cn(
-                          "text-xs font-typewriter",
-                          player.answers_today >= 2 && "text-eranove-green",
-                          player.answers_today === 1 && "text-eranove-yellow",
-                          player.answers_today === 0 && "text-primary"
-                        )}>
-                          {player.answers_today >= 2 ? '🟢' : player.answers_today === 1 ? '🟡' : '🔴'} {player.answers_today}/2
-                        </div>
-                      </>
-                    )}
+                    <span className="text-sm font-typewriter truncate block">{playerName}</span>
+                    <div className="text-xs font-typewriter text-eranove-green mt-1">
+                      🟢 2/2
+                    </div>
+                  </div>
+                ))}
+                {/* Partial players */}
+                {todayStats?.partialPlayers.map((playerName) => (
+                  <div
+                    key={playerName}
+                    className="p-3 rounded-sm border text-center bg-eranove-yellow/10 border-eranove-yellow/30"
+                  >
+                    <span className="text-sm font-typewriter truncate block">{playerName}</span>
+                    <div className="text-xs font-typewriter text-eranove-yellow mt-1">
+                      🟡 1/2
+                    </div>
                   </div>
                 ))}
               </div>
+              {(!todayStats?.completedPlayers.length && !todayStats?.partialPlayers.length) && (
+                <p className="text-center text-muted-foreground font-serif">
+                  Aucun joueur n'a encore participé aujourd'hui
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -348,34 +301,40 @@ const Admin = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                {leaderboard.map((player, index) => (
-                  <div
-                    key={player.player_id}
-                    className={cn(
-                      "flex items-center justify-between p-3 rounded-sm border",
-                      index === 0 && "bg-gold/10 border-gold/30",
-                      index === 1 && "bg-gray-300/10 border-gray-300/30",
-                      index === 2 && "bg-amber-600/10 border-amber-600/30",
-                      index > 2 && "bg-secondary/30 border-border"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={cn(
-                        "w-8 h-8 flex items-center justify-center rounded-full font-typewriter text-sm",
-                        index === 0 && "bg-gold text-background",
-                        index === 1 && "bg-gray-300 text-background",
-                        index === 2 && "bg-amber-600 text-background",
-                        index > 2 && "bg-muted text-muted-foreground"
-                      )}>
-                        {index + 1}
-                      </span>
-                      <span className="font-typewriter">{player.name}</span>
+              {leaderboard.length > 0 ? (
+                <div className="space-y-2">
+                  {leaderboard.map((player, index) => (
+                    <div
+                      key={player.name}
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-sm border",
+                        index === 0 && "bg-gold/10 border-gold/30",
+                        index === 1 && "bg-gray-300/10 border-gray-300/30",
+                        index === 2 && "bg-amber-600/10 border-amber-600/30",
+                        index > 2 && "bg-secondary/30 border-border"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={cn(
+                          "w-8 h-8 flex items-center justify-center rounded-full font-typewriter text-sm",
+                          index === 0 && "bg-gold text-background",
+                          index === 1 && "bg-gray-300 text-background",
+                          index === 2 && "bg-amber-600 text-background",
+                          index > 2 && "bg-muted text-muted-foreground"
+                        )}>
+                          {index + 1}
+                        </span>
+                        <span className="font-typewriter">{player.name}</span>
+                      </div>
+                      <span className="text-xl font-typewriter text-gold">{player.score} pts</span>
                     </div>
-                    <span className="text-xl font-typewriter text-gold">{player.score} pts</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground font-serif">
+                  Aucun score enregistré
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -438,16 +397,11 @@ const Admin = () => {
 
                   <div>
                     <label className="text-sm font-typewriter text-muted-foreground mb-1 block">RÉPONSE (NOM DU COLLÈGUE)</label>
-                    <select
+                    <Input
                       value={newClue.answer}
                       onChange={(e) => setNewClue({ ...newClue, answer: e.target.value })}
-                      className="flex h-10 w-full rounded-sm border-2 border-accent/30 bg-secondary/50 px-4 py-2 text-base text-foreground"
-                    >
-                      <option value="">Sélectionnez...</option>
-                      {players.map(p => (
-                        <option key={p.id} value={p.name}>{p.name}</option>
-                      ))}
-                    </select>
+                      placeholder="Entrez le nom..."
+                    />
                   </div>
 
                   <Button onClick={handleAddClue} className="w-full">
@@ -486,15 +440,11 @@ const Admin = () => {
                                 onChange={(e) => setEditForm({ ...editForm, text: e.target.value })}
                                 className="flex min-h-[80px] w-full rounded-sm border-2 border-accent/30 bg-secondary/50 px-4 py-2 text-base text-foreground font-serif resize-none"
                               />
-                              <select
+                              <Input
                                 value={editForm.answer || ''}
                                 onChange={(e) => setEditForm({ ...editForm, answer: e.target.value })}
-                                className="flex h-10 w-full rounded-sm border-2 border-accent/30 bg-secondary/50 px-4 py-2 text-base text-foreground"
-                              >
-                                {players.map(p => (
-                                  <option key={p.id} value={p.name}>{p.name}</option>
-                                ))}
-                              </select>
+                                placeholder="Réponse..."
+                              />
                               <div className="flex items-center gap-2">
                                 <Button size="sm" onClick={handleSaveEdit}>
                                   <Save className="w-4 h-4 mr-1" />
