@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Save, X, FileText, Eye, Lock, Users, Trophy, Calendar, AlertCircle, Check } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, FileText, Lock, Users, Trophy, Calendar, AlertCircle, Settings, Eye, EyeOff } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useAdminGame, Clue } from '@/hooks/useAdminGame';
+import { useAdminGame, Secret } from '@/hooks/useAdminGame';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -17,31 +17,32 @@ const Admin = () => {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
   const {
-    allClues,
+    secrets,
+    dailySecrets,
     todayStats,
     leaderboard,
-    todayAnswers,
-    today,
+    todayGuesses,
+    currentDay,
     loading,
     loadAdminData,
+    addSecret,
+    updateSecret,
+    deleteSecret,
     addClue,
     updateClue,
     deleteClue,
+    setDaySecrets,
+    refreshStats,
   } = useAdminGame(storedAdminCode);
 
   const { toast } = useToast();
 
-  const [isAdding, setIsAdding] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-
-  const [newClue, setNewClue] = useState({
-    day: today,
-    clueNumber: 1,
-    text: '',
-    answer: '',
-  });
-
-  const [editForm, setEditForm] = useState<Partial<Clue>>({});
+  const [activeTab, setActiveTab] = useState<'stats' | 'secrets' | 'days'>('stats');
+  const [isAddingSecret, setIsAddingSecret] = useState(false);
+  const [newSecret, setNewSecret] = useState({ title: '', person_name: '' });
+  const [editingSecretId, setEditingSecretId] = useState<string | null>(null);
+  const [editSecretForm, setEditSecretForm] = useState({ title: '', person_name: '' });
+  const [newClueText, setNewClueText] = useState<Record<string, string>>({});
 
   // Load admin data when authenticated
   useEffect(() => {
@@ -65,7 +66,6 @@ const Admin = () => {
       if (data.valid) {
         setIsAuthenticated(true);
         setStoredAdminCode(adminCode);
-        // Don't store in sessionStorage - require code on every session
       } else {
         setAuthError('Code admin incorrect');
       }
@@ -77,49 +77,60 @@ const Admin = () => {
     }
   };
 
-  const handleAddClue = async () => {
-    if (!newClue.text.trim() || !newClue.answer.trim()) return;
+  const handleAddSecret = async () => {
+    if (!newSecret.title.trim() || !newSecret.person_name.trim()) return;
 
-    const result = await addClue(newClue.day, newClue.clueNumber, newClue.text, newClue.answer);
+    const result = await addSecret(newSecret.title, newSecret.person_name);
 
     if (result.success) {
-      toast({ title: 'Indice ajouté', description: 'L\'indice a été créé avec succès.' });
-      setNewClue({
-        day: newClue.day,
-        clueNumber: newClue.clueNumber === 1 ? 2 : 1,
-        text: '',
-        answer: '',
-      });
-      setIsAdding(false);
+      toast({ title: 'Secret ajouté', description: 'Le secret a été créé avec succès.' });
+      setNewSecret({ title: '', person_name: '' });
+      setIsAddingSecret(false);
     } else {
       toast({ title: 'Erreur', description: result.error, variant: 'destructive' });
     }
   };
 
-  const handleStartEdit = (clue: Clue) => {
-    setEditingId(clue.id);
-    setEditForm(clue);
-  };
+  const handleUpdateSecret = async (secretId: string) => {
+    const result = await updateSecret(secretId, {
+      title: editSecretForm.title,
+      person_name: editSecretForm.person_name,
+    });
 
-  const handleSaveEdit = async () => {
-    if (editingId && editForm) {
-      const result = await updateClue(editingId, {
-        text: editForm.text,
-        answer: editForm.answer,
-      });
-
-      if (result.success) {
-        toast({ title: 'Indice modifié', description: 'Les modifications ont été enregistrées.' });
-        setEditingId(null);
-        setEditForm({});
-      } else {
-        toast({ title: 'Erreur', description: result.error, variant: 'destructive' });
-      }
+    if (result.success) {
+      toast({ title: 'Secret modifié' });
+      setEditingSecretId(null);
+    } else {
+      toast({ title: 'Erreur', description: result.error, variant: 'destructive' });
     }
   };
 
-  const handleDeleteClue = async (id: string) => {
-    const result = await deleteClue(id);
+  const handleDeleteSecret = async (secretId: string) => {
+    if (!confirm('Supprimer ce secret ?')) return;
+    
+    const result = await deleteSecret(secretId);
+    if (result.success) {
+      toast({ title: 'Secret supprimé' });
+    } else {
+      toast({ title: 'Erreur', description: result.error, variant: 'destructive' });
+    }
+  };
+
+  const handleAddClue = async (secretId: string) => {
+    const text = newClueText[secretId];
+    if (!text?.trim()) return;
+
+    const result = await addClue(secretId, text);
+    if (result.success) {
+      toast({ title: 'Indice ajouté' });
+      setNewClueText({ ...newClueText, [secretId]: '' });
+    } else {
+      toast({ title: 'Erreur', description: result.error, variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteClue = async (clueId: string) => {
+    const result = await deleteClue(clueId);
     if (result.success) {
       toast({ title: 'Indice supprimé' });
     } else {
@@ -127,23 +138,27 @@ const Admin = () => {
     }
   };
 
-  // Group clues by day
-  const groupedClues = allClues.reduce((acc, clue) => {
-    const day = clue.day;
-    if (!acc[day]) acc[day] = [];
-    acc[day].push(clue);
-    return acc;
-  }, {} as Record<string, Clue[]>);
+  const handleSetDaySecrets = async (day: number, secret1Id: string | null, secret2Id: string | null) => {
+    const result = await setDaySecrets(day, secret1Id, secret2Id);
+    if (result.success) {
+      toast({ title: `Jour ${day} configuré` });
+    } else {
+      toast({ title: 'Erreur', description: result.error, variant: 'destructive' });
+    }
+  };
 
-  // Stats for today
+  const getDayConfig = (day: number) => {
+    return dailySecrets.find(d => d.day === day);
+  };
+
+  const getSecretById = (id: string | null) => {
+    if (!id) return null;
+    return secrets.find(s => s.id === id);
+  };
+
+  // Stats
   const completedCount = todayStats?.completedPlayers.length || 0;
   const partialCount = todayStats?.partialPlayers.length || 0;
-
-  // Get player status for today
-  const getPlayerStatus = (playerName: string) => {
-    const playerAnswers = todayAnswers.filter(a => a.player_name === playerName);
-    return playerAnswers.length;
-  };
 
   // Auth screen
   if (!isAuthenticated) {
@@ -200,7 +215,7 @@ const Admin = () => {
       <Header />
 
       <main className="container mx-auto px-4 pt-24 pb-12">
-        <div className="text-center mb-12 animate-fade-in">
+        <div className="text-center mb-8 animate-fade-in">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/20 rounded-sm border border-primary/30 mb-6">
             <FileText className="w-4 h-4 text-primary" />
             <span className="font-typewriter text-sm text-primary uppercase tracking-wider">
@@ -213,282 +228,387 @@ const Admin = () => {
           </h1>
         </div>
 
-        {/* Today's Summary */}
+        {/* Tabs */}
         <div className="max-w-5xl mx-auto mb-8">
-          <Card className="bg-card/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-accent" />
-                Résumé du jour ({today})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="text-center p-4 bg-eranove-green/10 rounded-sm border border-eranove-green/30">
-                  <div className="text-3xl font-typewriter text-eranove-green">{completedCount}</div>
-                  <div className="text-sm text-muted-foreground">Terminé (2/2)</div>
-                </div>
-                <div className="text-center p-4 bg-eranove-yellow/10 rounded-sm border border-eranove-yellow/30">
-                  <div className="text-3xl font-typewriter text-eranove-yellow">{partialCount}</div>
-                  <div className="text-sm text-muted-foreground">En cours (1/2)</div>
-                </div>
-              </div>
-
-              {completedCount < 16 && (
-                <div className="flex items-center gap-2 p-3 bg-primary/20 rounded-sm border border-primary/30">
-                  <AlertCircle className="w-5 h-5 text-primary" />
-                  <span className="text-primary font-typewriter text-sm">
-                    ATTENTION: Moins de 16 joueurs ont terminé aujourd'hui
-                  </span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <div className="flex gap-2 border-b border-border pb-2">
+            <Button
+              variant={activeTab === 'stats' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('stats')}
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Statistiques
+            </Button>
+            <Button
+              variant={activeTab === 'secrets' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('secrets')}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Secrets ({secrets.length}/20)
+            </Button>
+            <Button
+              variant={activeTab === 'days' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('days')}
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              Journées
+            </Button>
+          </div>
         </div>
 
-        {/* Player Status Grid */}
-        <div className="max-w-5xl mx-auto mb-8">
-          <Card className="bg-card/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-accent" />
-                Joueurs du jour ({todayStats?.completedPlayers.length || 0} + {todayStats?.partialPlayers.length || 0} joueurs)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                {/* Completed players */}
-                {todayStats?.completedPlayers.map((playerName) => (
-                  <div
-                    key={playerName}
-                    className="p-3 rounded-sm border text-center bg-eranove-green/10 border-eranove-green/30"
-                  >
-                    <span className="text-sm font-typewriter truncate block">{playerName}</span>
-                    <div className="text-xs font-typewriter text-eranove-green mt-1">
-                      🟢 2/2
-                    </div>
+        {/* Stats Tab */}
+        {activeTab === 'stats' && (
+          <div className="max-w-5xl mx-auto space-y-8">
+            {/* Today's Summary */}
+            <Card className="bg-card/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-accent" />
+                  Résumé du jour (Jour {currentDay})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="text-center p-4 bg-eranove-green/10 rounded-sm border border-eranove-green/30">
+                    <div className="text-3xl font-typewriter text-eranove-green">{completedCount}</div>
+                    <div className="text-sm text-muted-foreground">Terminé (2/2)</div>
                   </div>
-                ))}
-                {/* Partial players */}
-                {todayStats?.partialPlayers.map((playerName) => (
-                  <div
-                    key={playerName}
-                    className="p-3 rounded-sm border text-center bg-eranove-yellow/10 border-eranove-yellow/30"
-                  >
-                    <span className="text-sm font-typewriter truncate block">{playerName}</span>
-                    <div className="text-xs font-typewriter text-eranove-yellow mt-1">
-                      🟡 1/2
-                    </div>
+                  <div className="text-center p-4 bg-eranove-yellow/10 rounded-sm border border-eranove-yellow/30">
+                    <div className="text-3xl font-typewriter text-eranove-yellow">{partialCount}</div>
+                    <div className="text-sm text-muted-foreground">En cours (1/2)</div>
                   </div>
-                ))}
-              </div>
-              {(!todayStats?.completedPlayers.length && !todayStats?.partialPlayers.length) && (
-                <p className="text-center text-muted-foreground font-serif">
-                  Aucun joueur n'a encore participé aujourd'hui
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                </div>
 
-        {/* Leaderboard */}
-        <div className="max-w-5xl mx-auto mb-8">
-          <Card className="bg-card/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-gold" />
-                Classement Général
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {leaderboard.length > 0 ? (
-                <div className="space-y-2">
-                  {leaderboard.map((player, index) => (
+                {completedCount < 16 && (
+                  <div className="flex items-center gap-2 p-3 bg-primary/20 rounded-sm border border-primary/30">
+                    <AlertCircle className="w-5 h-5 text-primary" />
+                    <span className="text-primary font-typewriter text-sm">
+                      ATTENTION: Moins de 16 joueurs ont terminé aujourd'hui
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Player Status Grid */}
+            <Card className="bg-card/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-accent" />
+                  Joueurs du jour
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                  {todayStats?.completedPlayers.map((playerName) => (
                     <div
-                      key={player.name}
-                      className={cn(
-                        "flex items-center justify-between p-3 rounded-sm border",
-                        index === 0 && "bg-gold/10 border-gold/30",
-                        index === 1 && "bg-gray-300/10 border-gray-300/30",
-                        index === 2 && "bg-amber-600/10 border-amber-600/30",
-                        index > 2 && "bg-secondary/30 border-border"
-                      )}
+                      key={playerName}
+                      className="p-3 rounded-sm border text-center bg-eranove-green/10 border-eranove-green/30"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className={cn(
-                          "w-8 h-8 flex items-center justify-center rounded-full font-typewriter text-sm",
-                          index === 0 && "bg-gold text-background",
-                          index === 1 && "bg-gray-300 text-background",
-                          index === 2 && "bg-amber-600 text-background",
-                          index > 2 && "bg-muted text-muted-foreground"
-                        )}>
-                          {index + 1}
-                        </span>
-                        <span className="font-typewriter">{player.name}</span>
-                      </div>
-                      <span className="text-xl font-typewriter text-gold">{player.score} pts</span>
+                      <span className="text-sm font-typewriter truncate block">{playerName}</span>
+                      <div className="text-xs font-typewriter text-eranove-green mt-1">🟢 2/2</div>
+                    </div>
+                  ))}
+                  {todayStats?.partialPlayers.map((playerName) => (
+                    <div
+                      key={playerName}
+                      className="p-3 rounded-sm border text-center bg-eranove-yellow/10 border-eranove-yellow/30"
+                    >
+                      <span className="text-sm font-typewriter truncate block">{playerName}</span>
+                      <div className="text-xs font-typewriter text-eranove-yellow mt-1">🟡 1/2</div>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-center text-muted-foreground font-serif">
-                  Aucun score enregistré
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                {!todayStats?.completedPlayers.length && !todayStats?.partialPlayers.length && (
+                  <p className="text-center text-muted-foreground font-serif">
+                    Aucun joueur n'a encore participé aujourd'hui
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
-        {/* Clue Management */}
-        <div className="max-w-5xl mx-auto">
-          <Card className="bg-card/80 backdrop-blur-sm mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Eye className="w-5 h-5 text-accent" />
-                Gestion des Indices
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!isAdding ? (
-                <Button onClick={() => setIsAdding(true)} variant="outline" className="w-full">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Ajouter un nouvel indice
-                </Button>
-              ) : (
-                <div className="space-y-4 p-4 bg-secondary/30 rounded-sm border border-border">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-typewriter text-accent">Nouvel Indice</h4>
-                    <Button variant="ghost" size="icon" onClick={() => setIsAdding(false)}>
-                      <X className="w-4 h-4" />
+            {/* Leaderboard */}
+            <Card className="bg-card/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-gold" />
+                  Classement Général
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {leaderboard.length > 0 ? (
+                  <div className="space-y-2">
+                    {leaderboard.map((player, index) => (
+                      <div
+                        key={player.name}
+                        className={cn(
+                          "flex items-center justify-between p-3 rounded-sm border",
+                          index === 0 && "bg-gold/10 border-gold/30",
+                          index === 1 && "bg-gray-300/10 border-gray-300/30",
+                          index === 2 && "bg-amber-600/10 border-amber-600/30",
+                          index > 2 && "bg-secondary/30 border-border"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={cn(
+                            "w-8 h-8 flex items-center justify-center rounded-full font-typewriter text-sm",
+                            index === 0 && "bg-gold text-background",
+                            index === 1 && "bg-gray-300 text-background",
+                            index === 2 && "bg-amber-600 text-background",
+                            index > 2 && "bg-muted text-muted-foreground"
+                          )}>
+                            {index + 1}
+                          </span>
+                          <span className="font-typewriter">{player.name}</span>
+                        </div>
+                        <span className="text-xl font-typewriter text-gold">{player.score} pts</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground font-serif">Aucun score enregistré</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Secrets Tab */}
+        {activeTab === 'secrets' && (
+          <div className="max-w-5xl mx-auto space-y-6">
+            <Card className="bg-card/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-accent" />
+                    Gestion des Secrets ({secrets.length}/20)
+                  </span>
+                  {secrets.length < 20 && !isAddingSecret && (
+                    <Button onClick={() => setIsAddingSecret(true)} variant="outline" size="sm">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Ajouter
+                    </Button>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Add secret form */}
+                {isAddingSecret && (
+                  <div className="p-4 bg-secondary/30 rounded-sm border border-border space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-typewriter text-accent">Nouveau Secret</h4>
+                      <Button variant="ghost" size="icon" onClick={() => setIsAddingSecret(false)}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <Input
+                      value={newSecret.title}
+                      onChange={(e) => setNewSecret({ ...newSecret, title: e.target.value })}
+                      placeholder="Titre du secret..."
+                    />
+                    <Input
+                      value={newSecret.person_name}
+                      onChange={(e) => setNewSecret({ ...newSecret, person_name: e.target.value })}
+                      placeholder="Nom de la personne (réponse correcte)..."
+                    />
+                    <Button onClick={handleAddSecret} className="w-full">
+                      <Save className="w-4 h-4 mr-2" />
+                      Enregistrer
                     </Button>
                   </div>
+                )}
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-typewriter text-muted-foreground mb-1 block">JOUR</label>
-                      <Input
-                        type="date"
-                        value={newClue.day}
-                        onChange={(e) => setNewClue({ ...newClue, day: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-typewriter text-muted-foreground mb-1 block">INDICE N°</label>
-                      <select
-                        value={newClue.clueNumber}
-                        onChange={(e) => setNewClue({ ...newClue, clueNumber: parseInt(e.target.value) })}
-                        className="flex h-10 w-full rounded-sm border-2 border-accent/30 bg-secondary/50 px-4 py-2 text-base text-foreground"
-                      >
-                        <option value={1}>Indice 1</option>
-                        <option value={2}>Indice 2</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-typewriter text-muted-foreground mb-1 block">CONTENU DE L'INDICE</label>
-                    <textarea
-                      value={newClue.text}
-                      onChange={(e) => setNewClue({ ...newClue, text: e.target.value })}
-                      placeholder="Description de l'indice..."
-                      className="flex min-h-[100px] w-full rounded-sm border-2 border-accent/30 bg-secondary/50 px-4 py-2 text-base text-foreground font-serif resize-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-typewriter text-muted-foreground mb-1 block">RÉPONSE (NOM DU COLLÈGUE)</label>
-                    <Input
-                      value={newClue.answer}
-                      onChange={(e) => setNewClue({ ...newClue, answer: e.target.value })}
-                      placeholder="Entrez le nom..."
-                    />
-                  </div>
-
-                  <Button onClick={handleAddClue} className="w-full">
-                    <Save className="w-4 h-4 mr-2" />
-                    Enregistrer l'indice
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Clues History */}
-          <div className="space-y-6">
-            {Object.entries(groupedClues)
-              .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
-              .map(([day, clues]) => (
-                <Card key={day} className="bg-card/80 backdrop-blur-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="w-5 h-5 text-accent" />
-                      {day} {day === today && <span className="text-xs bg-eranove-green/20 text-eranove-green px-2 py-1 rounded">AUJOURD'HUI</span>}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {clues
-                      .sort((a, b) => a.clue_number - b.clue_number)
-                      .map((clue) => (
-                        <div
-                          key={clue.id}
-                          className="p-4 rounded-sm border bg-secondary/30 border-accent/20"
-                        >
-                          {editingId === clue.id ? (
-                            <div className="space-y-4">
-                              <textarea
-                                value={editForm.text || ''}
-                                onChange={(e) => setEditForm({ ...editForm, text: e.target.value })}
-                                className="flex min-h-[80px] w-full rounded-sm border-2 border-accent/30 bg-secondary/50 px-4 py-2 text-base text-foreground font-serif resize-none"
-                              />
-                              <Input
-                                value={editForm.answer || ''}
-                                onChange={(e) => setEditForm({ ...editForm, answer: e.target.value })}
-                                placeholder="Réponse..."
-                              />
-                              <div className="flex items-center gap-2">
-                                <Button size="sm" onClick={handleSaveEdit}>
-                                  <Save className="w-4 h-4 mr-1" />
-                                  Sauvegarder
-                                </Button>
-                                <Button size="sm" variant="ghost" onClick={() => { setEditingId(null); setEditForm({}); }}>
-                                  <X className="w-4 h-4 mr-1" />
-                                  Annuler
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="flex items-start justify-between gap-4 mb-2">
-                                <span className="font-typewriter text-sm text-accent">
-                                  INDICE #{clue.clue_number}
-                                </span>
-                                <div className="flex items-center gap-1">
-                                  <Button variant="ghost" size="icon" onClick={() => handleStartEdit(clue)}>
-                                    <Edit2 className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDeleteClue(clue.id)}
-                                    className="text-destructive hover:text-destructive"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                              <p className="text-foreground/80 font-serif italic mb-2">"{clue.text}"</p>
-                              <p className="text-sm text-muted-foreground font-typewriter">
-                                RÉPONSE: <span className="text-gold">{clue.answer}</span>
-                              </p>
-                            </>
-                          )}
+                {/* Secrets list */}
+                {secrets.map((secret) => (
+                  <div key={secret.id} className="p-4 bg-secondary/30 rounded-sm border border-accent/20">
+                    {editingSecretId === secret.id ? (
+                      <div className="space-y-3">
+                        <Input
+                          value={editSecretForm.title}
+                          onChange={(e) => setEditSecretForm({ ...editSecretForm, title: e.target.value })}
+                          placeholder="Titre..."
+                        />
+                        <Input
+                          value={editSecretForm.person_name}
+                          onChange={(e) => setEditSecretForm({ ...editSecretForm, person_name: e.target.value })}
+                          placeholder="Personne..."
+                        />
+                        <div className="flex gap-2">
+                          <Button onClick={() => handleUpdateSecret(secret.id)} size="sm">
+                            <Save className="w-4 h-4 mr-1" /> Sauver
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setEditingSecretId(null)}>
+                            <X className="w-4 h-4" />
+                          </Button>
                         </div>
-                      ))}
-                  </CardContent>
-                </Card>
-              ))}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h4 className="font-typewriter text-lg text-accent">{secret.title}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Réponse: <span className="text-eranove-green">{secret.person_name}</span>
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingSecretId(secret.id);
+                                setEditSecretForm({ title: secret.title, person_name: secret.person_name });
+                              }}
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteSecret(secret.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Clues */}
+                        <div className="border-t border-border/50 pt-3 mt-3">
+                          <p className="text-xs text-muted-foreground font-typewriter mb-2">
+                            INDICES ({secret.clues.length})
+                          </p>
+                          {secret.clues.map((clue, i) => (
+                            <div key={clue.id} className="flex items-center justify-between py-1 text-sm">
+                              <span className="text-foreground/80">
+                                <span className="text-accent">#{i + 1}</span> {clue.text}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteClue(clue.id)}
+                                className="h-6 w-6 text-destructive"
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ))}
+                          <div className="flex gap-2 mt-2">
+                            <Input
+                              value={newClueText[secret.id] || ''}
+                              onChange={(e) => setNewClueText({ ...newClueText, [secret.id]: e.target.value })}
+                              placeholder="Ajouter un indice..."
+                              className="text-sm"
+                            />
+                            <Button size="sm" onClick={() => handleAddClue(secret.id)}>
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+
+                {secrets.length === 0 && !isAddingSecret && (
+                  <p className="text-center text-muted-foreground py-8 font-serif">
+                    Aucun secret créé. Cliquez sur "Ajouter" pour commencer.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        </div>
+        )}
+
+        {/* Days Tab */}
+        {activeTab === 'days' && (
+          <div className="max-w-5xl mx-auto space-y-4">
+            <Card className="bg-card/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-accent" />
+                  Configuration des 10 Journées
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((day) => {
+                    const config = getDayConfig(day);
+                    const secret1 = getSecretById(config?.secret1_id || null);
+                    const secret2 = getSecretById(config?.secret2_id || null);
+                    const isToday = day === currentDay;
+
+                    return (
+                      <div
+                        key={day}
+                        className={cn(
+                          "p-4 rounded-sm border",
+                          isToday ? "bg-accent/10 border-accent/30" : "bg-secondary/30 border-border"
+                        )}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-typewriter text-lg">
+                            JOUR {day}
+                            {isToday && (
+                              <span className="ml-2 text-xs bg-accent text-background px-2 py-1 rounded">
+                                AUJOURD'HUI
+                              </span>
+                            )}
+                          </h4>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs text-muted-foreground font-typewriter block mb-1">
+                              SECRET 1
+                            </label>
+                            <select
+                              value={config?.secret1_id || ''}
+                              onChange={(e) => handleSetDaySecrets(day, e.target.value || null, config?.secret2_id || null)}
+                              className="w-full p-2 rounded-sm bg-secondary/50 border border-border text-sm"
+                            >
+                              <option value="">-- Non défini --</option>
+                              {secrets.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.title} ({s.person_name})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground font-typewriter block mb-1">
+                              SECRET 2
+                            </label>
+                            <select
+                              value={config?.secret2_id || ''}
+                              onChange={(e) => handleSetDaySecrets(day, config?.secret1_id || null, e.target.value || null)}
+                              className="w-full p-2 rounded-sm bg-secondary/50 border border-border text-sm"
+                            >
+                              <option value="">-- Non défini --</option>
+                              {secrets.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.title} ({s.person_name})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {(secret1 || secret2) && (
+                          <div className="mt-3 pt-3 border-t border-border/50 text-sm text-muted-foreground">
+                            <Eye className="w-4 h-4 inline mr-1" />
+                            {secret1 && <span className="text-accent">{secret1.title}</span>}
+                            {secret1 && secret2 && ' & '}
+                            {secret2 && <span className="text-accent">{secret2.title}</span>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </main>
     </div>
   );

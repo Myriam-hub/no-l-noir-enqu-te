@@ -14,73 +14,111 @@ export type Database = {
   }
   public: {
     Tables: {
-      answers: {
+      clues: {
         Row: {
-          clue_id: string
           created_at: string
-          day: string
           id: string
-          is_correct: boolean
-          player_id: string | null
-          player_name: string | null
-          response: string
+          secret_id: string
+          text: string
         }
         Insert: {
-          clue_id: string
           created_at?: string
-          day: string
           id?: string
-          is_correct?: boolean
-          player_id?: string | null
-          player_name?: string | null
-          response: string
+          secret_id: string
+          text: string
         }
         Update: {
-          clue_id?: string
           created_at?: string
-          day?: string
           id?: string
-          is_correct?: boolean
-          player_id?: string | null
-          player_name?: string | null
-          response?: string
+          secret_id?: string
+          text?: string
         }
         Relationships: [
           {
-            foreignKeyName: "answers_clue_id_fkey"
-            columns: ["clue_id"]
+            foreignKeyName: "clues_secret_id_fkey"
+            columns: ["secret_id"]
             isOneToOne: false
-            referencedRelation: "clues"
+            referencedRelation: "secrets"
             referencedColumns: ["id"]
           },
         ]
       }
-      clues: {
+      daily_secrets: {
         Row: {
-          answer: string
-          clue_number: number
           created_at: string
-          day: string
+          day: number
           id: string
-          text: string
+          secret1_id: string | null
+          secret2_id: string | null
         }
         Insert: {
-          answer: string
-          clue_number: number
           created_at?: string
-          day: string
+          day: number
           id?: string
-          text: string
+          secret1_id?: string | null
+          secret2_id?: string | null
         }
         Update: {
-          answer?: string
-          clue_number?: number
           created_at?: string
-          day?: string
+          day?: number
           id?: string
-          text?: string
+          secret1_id?: string | null
+          secret2_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "daily_secrets_secret1_id_fkey"
+            columns: ["secret1_id"]
+            isOneToOne: false
+            referencedRelation: "secrets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_secrets_secret2_id_fkey"
+            columns: ["secret2_id"]
+            isOneToOne: false
+            referencedRelation: "secrets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guesses: {
+        Row: {
+          created_at: string
+          day: number
+          guess_name: string
+          id: string
+          is_correct: boolean
+          player_name: string
+          secret_id: string
+        }
+        Insert: {
+          created_at?: string
+          day: number
+          guess_name: string
+          id?: string
+          is_correct?: boolean
+          player_name: string
+          secret_id: string
+        }
+        Update: {
+          created_at?: string
+          day?: number
+          guess_name?: string
+          id?: string
+          is_correct?: boolean
+          player_name?: string
+          secret_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guesses_secret_id_fkey"
+            columns: ["secret_id"]
+            isOneToOne: false
+            referencedRelation: "secrets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       players: {
         Row: {
@@ -97,6 +135,30 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      secrets: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          person_name: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          person_name: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          person_name?: string
+          title?: string
         }
         Relationships: []
       }
