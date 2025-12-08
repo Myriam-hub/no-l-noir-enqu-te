@@ -1,4 +1,4 @@
-import { Search, Gift, Fingerprint } from 'lucide-react';
+import { Search, Fingerprint } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 export const Header = () => {
@@ -16,13 +16,10 @@ export const Header = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="relative">
-              <Search className="w-8 h-8 text-primary" />
-              <Gift className="w-4 h-4 text-secondary absolute -bottom-1 -right-1" />
-            </div>
+            <Search className="w-8 h-8 text-primary" />
             <div className="flex flex-col">
               <span className="font-semibold text-lg text-foreground">JEU ERANOVE ACADEMY</span>
-              <span className="text-xs text-muted-foreground -mt-1">Les enquêtes impossibles du Personnel</span>
+              <span className="text-xs text-muted-foreground -mt-1">Les enquêtes impossibles EA</span>
             </div>
           </Link>
 
