@@ -75,7 +75,7 @@ const Index = () => {
       hash = ((hash << 5) - hash) + secretId.charCodeAt(i);
       hash |= 0;
     }
-    return Math.abs(hash % 100) + 1; // Returns a number between 1-100
+    return (Math.abs(hash) % 20) + 1; // Returns a number between 1-20
   };
   if (loading) {
     return <div className="min-h-screen bg-background flex items-center justify-center">
@@ -150,19 +150,21 @@ const Index = () => {
                   Les Dossiers Secrets ({allSecrets.length}/20)
                 </h2>
                 <div className="flex flex-wrap justify-center gap-4 max-w-4xl mx-auto">
-                  {allSecrets.filter(s => !s.first_found_by).map((secret) => {
+                  {allSecrets.map((secret) => {
                 const isAnswered = hasAnsweredSecret(secret.id);
+                const isTaken = !!secret.first_found_by;
                 const secretNumber = getSecretNumber(secret.id);
                 const guess = getGuessForSecret(secret.id);
                 return <button key={secret.id} onClick={() => setSelectedSecret(secret.id)} className={`
                           secret-icon relative
-                          bg-card border-2 border-border
+                          ${isTaken ? 'bg-destructive/5 border-2 border-destructive/30' : 'bg-card border-2 border-border'}
                           ${isAnswered ? 'opacity-60' : ''}
-                        `} title={`Secret #${secretNumber}`}>
-                        <FolderClosed className="w-10 h-10 text-primary" />
+                        `} title={`Secret #${secretNumber}${isTaken ? ' - Point déjà pris' : ''}`}>
+                        <FolderClosed className={`w-10 h-10 ${isTaken ? 'text-destructive/50' : 'text-primary'}`} />
                         <span className="absolute -top-2 -right-2 w-6 h-6 bg-primary text-primary-foreground rounded-full text-xs flex items-center justify-center font-semibold">
                           {secretNumber}
                         </span>
+                        {isTaken && <X className="absolute w-16 h-16 text-destructive/70 stroke-[3]" />}
                         {isAnswered && guess?.is_correct && <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-accent text-accent-foreground text-xs px-2 py-0.5 rounded-full">
                             ✓
                           </div>}
