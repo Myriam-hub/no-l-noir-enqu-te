@@ -42,14 +42,17 @@ serve(async (req) => {
 
     if (secretsError) throw secretsError;
 
-    // Normalize player name function (remove accents, lowercase, trim)
+    // Normalize player name function (remove accents, lowercase, trim, use first name only for matching)
     const normalizeName = (name: string): string => {
-      return name
+      const normalized = name
         .toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "") // Remove accents
         .trim()
         .replace(/\s+/g, " "); // Normalize spaces
+      
+      // Use only the first word (first name) for matching
+      return normalized.split(" ")[0];
     };
 
     // Map normalized names to their display name (use the first occurrence)
