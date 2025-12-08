@@ -42,21 +42,47 @@ serve(async (req) => {
 
     if (secretsError) throw secretsError;
 
-    // Calculate unique players
-    const uniquePlayers = [...new Set(allGuesses?.map(g => g.player_name) || [])];
+    // Normalize player name function (remove accents, lowercase, trim)
+    const normalizeName = (name: string): string => {
+      return name
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Remove accents
+        .trim()
+        .replace(/\s+/g, " "); // Normalize spaces
+    };
+
+    // Map normalized names to their display name (use the first occurrence)
+    const nameMap: Record<string, string> = {};
+    const getDisplayName = (name: string): string => {
+      const normalized = normalizeName(name);
+      if (!nameMap[normalized]) {
+        nameMap[normalized] = name;
+      }
+      return nameMap[normalized];
+    };
+
+    // First pass: collect all names from guesses to build the name map
+    allGuesses?.forEach(g => getDisplayName(g.player_name));
+
+    // Calculate unique players (normalized)
+    const uniqueNormalizedPlayers = [...new Set(allGuesses?.map(g => normalizeName(g.player_name)) || [])];
 
     // Count secrets found by each player (first finder only = 1 point each)
     const playerScores: Record<string, number> = {};
     allSecrets?.forEach(s => {
       if (s.first_found_by) {
-        playerScores[s.first_found_by] = (playerScores[s.first_found_by] || 0) + 1;
+        const normalized = normalizeName(s.first_found_by);
+        const displayName = nameMap[normalized] || s.first_found_by;
+        playerScores[displayName] = (playerScores[displayName] || 0) + 1;
       }
     });
 
     // Add players with 0 points who have guessed but not found any
-    uniquePlayers.forEach(p => {
-      if (!(p in playerScores)) {
-        playerScores[p] = 0;
+    uniqueNormalizedPlayers.forEach(normalized => {
+      const displayName = nameMap[normalized];
+      if (displayName && !(displayName in playerScores)) {
+        playerScores[displayName] = 0;
       }
     });
 
@@ -72,7 +98,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         stats: {
-          totalPlayers: uniquePlayers.length,
+          totalPlayers: uniqueNormalizedPlayers.length,
           secretsFound,
           totalSecrets,
           totalGuesses: allGuesses?.length || 0,
