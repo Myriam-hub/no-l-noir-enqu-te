@@ -424,6 +424,16 @@ const Admin = () => {
                             <p className="text-sm text-muted-foreground">
                               Réponse: <span className="text-eranove-green">{secret.person_name}</span>
                             </p>
+                            {secret.first_found_by ? (
+                              <p className="text-sm text-accent">
+                                <Trophy className="w-3 h-3 inline mr-1" />
+                                Trouvé par: <span className="font-semibold">{secret.first_found_by}</span>
+                              </p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground/50 italic">
+                                Pas encore trouvé
+                              </p>
+                            )}
                           </div>
                           <div className="flex gap-2">
                             <Button
