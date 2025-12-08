@@ -67,8 +67,16 @@ const Index = () => {
   };
   const selectedSecretData = allSecrets.find(s => s.id === selectedSecret);
 
-  // Get eliminated people (secrets that have been found)
-  const eliminatedPeople = allSecrets.filter(s => s.first_found_by).map(s => s.person_name);
+  // Create a shuffled but stable order for secret numbers (based on secret id)
+  const getSecretNumber = (secretId: string) => {
+    // Use a hash of the secret id to create a stable but shuffled number
+    let hash = 0;
+    for (let i = 0; i < secretId.length; i++) {
+      hash = ((hash << 5) - hash) + secretId.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash % 100) + 1; // Returns a number between 1-100
+  };
   if (loading) {
     return <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -142,20 +150,19 @@ const Index = () => {
                   Les Dossiers Secrets ({allSecrets.length}/20)
                 </h2>
                 <div className="flex flex-wrap justify-center gap-4 max-w-4xl mx-auto">
-                  {allSecrets.map((secret, index) => {
+                  {allSecrets.filter(s => !s.first_found_by).map((secret) => {
                 const isAnswered = hasAnsweredSecret(secret.id);
-                const isTaken = !!secret.first_found_by;
+                const secretNumber = getSecretNumber(secret.id);
                 const guess = getGuessForSecret(secret.id);
                 return <button key={secret.id} onClick={() => setSelectedSecret(secret.id)} className={`
                           secret-icon relative
-                          ${isTaken ? 'bg-destructive/5 border-2 border-destructive/30' : 'bg-card border-2 border-border'}
+                          bg-card border-2 border-border
                           ${isAnswered ? 'opacity-60' : ''}
-                        `} title={`Secret #${index + 1}${isTaken ? ' - Point déjà pris' : ''}`}>
-                        <FolderClosed className={`w-10 h-10 ${isTaken ? 'text-destructive/50' : 'text-primary'}`} />
+                        `} title={`Secret #${secretNumber}`}>
+                        <FolderClosed className="w-10 h-10 text-primary" />
                         <span className="absolute -top-2 -right-2 w-6 h-6 bg-primary text-primary-foreground rounded-full text-xs flex items-center justify-center font-semibold">
-                          {index + 1}
+                          {secretNumber}
                         </span>
-                        {isTaken && <X className="absolute w-16 h-16 text-destructive/70 stroke-[3]" />}
                         {isAnswered && guess?.is_correct && <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-accent text-accent-foreground text-xs px-2 py-0.5 rounded-full">
                             ✓
                           </div>}
@@ -164,20 +171,6 @@ const Index = () => {
                 </div>
               </div>
 
-              {/* Eliminated People */}
-              {eliminatedPeople.length > 0 && <div className="max-w-2xl mx-auto mb-8">
-                  <h3 className="text-lg font-semibold text-foreground mb-4 text-center">
-                    Personnes Identifiées
-                  </h3>
-                  <div className="flex flex-wrap justify-center gap-3">
-                    {eliminatedPeople.map((person, i) => <div key={i} className="flex items-center gap-2 px-3 py-2 bg-destructive/10 rounded-full border border-destructive/20">
-                        <div className="eliminated-avatar relative">
-                          <User className="w-5 h-5 text-destructive/60" />
-                        </div>
-                        <span className="text-sm text-destructive/80 line-through">{person}</span>
-                      </div>)}
-                  </div>
-                </div>}
 
               {/* Rules */}
               <div className="max-w-2xl mx-auto mt-12 p-6 bg-muted/30 rounded-lg border border-border">
@@ -222,7 +215,7 @@ const Index = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FolderClosed className="w-5 h-5 text-primary" />
-              Secret #{allSecrets.findIndex(s => s.id === selectedSecret) + 1}
+              Secret #{selectedSecret ? getSecretNumber(selectedSecret) : ''}
             </DialogTitle>
           </DialogHeader>
           {selectedSecretData && <SecretCard secret={selectedSecretData} secretIndex={allSecrets.findIndex(s => s.id === selectedSecret)} onSubmitGuess={handleSubmitGuess} existingGuess={getGuessForSecret(selectedSecretData.id)} playerName={currentPlayerName} onClose={() => setSelectedSecret(null)} />}
